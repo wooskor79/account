@@ -20,37 +20,23 @@ function fetchTheoryExcelFile(url = '필기문제.xlsx') {
     if (startBtn) startBtn.disabled = true;
 
     const cleanUrl = url.replace(/^excels\//, '');
-    const urlsToTry = [
-        'excels/' + encodeURI(cleanUrl),
-        'excels/' + cleanUrl,
-        encodeURI(cleanUrl),
-        cleanUrl
-    ];
+    const targetUrl = '?action=download_excel&file=' + encodeURIComponent(cleanUrl);
 
-    function tryFetch(index) {
-        if (index >= urlsToTry.length) {
-            if (status) status.innerHTML = `'${url}' 파일을 불러오지 못했습니다.`;
-            return;
-        }
-
-        const targetUrl = urlsToTry[index];
-        fetch(targetUrl)
-            .then(res => {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.arrayBuffer();
-            })
-            .then(buffer => {
-                if (typeof excelWorker !== 'undefined') {
-                    excelWorker.postMessage({ data: buffer, type: 'theory', fileKey: url });
-                }
-            })
-            .catch(err => {
-                console.warn(`[${targetUrl}] 로드 실패, 다음 시도...`, err);
-                tryFetch(index + 1);
-            });
-    }
-
-    tryFetch(0);
+    fetch(targetUrl)
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.arrayBuffer();
+        })
+        .then(buffer => {
+            const worker = window.excelWorker || (typeof excelWorker !== 'undefined' ? excelWorker : null);
+            if (worker) {
+                worker.postMessage({ data: buffer, type: 'theory', fileKey: url });
+            }
+        })
+        .catch(err => {
+            console.error(`[${targetUrl}] 로드 실패:`, err);
+            if (status) status.innerHTML = `'${url}' 파일을 불러오지 못했습니다. (서버 통신 오류)`;
+        });
 }
 
 function handleTheoryFileSelect(e) {

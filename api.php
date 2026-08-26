@@ -801,7 +801,48 @@ if ($action) {
         header('Expires: 0');
         header('Cache-Control: must-revalidate');
         header('Pragma: public');
+        readfile($target_path);
+        exit;
+    }
+
+    if ($action === 'download_excel') {
+        $file = isset($_GET['file']) ? $_GET['file'] : '';
+        if (strpos($file, '..') !== false || strpos($file, '/') !== false || strpos($file, '\\') !== false) {
+            http_response_code(403);
+            exit('잘못된 접근입니다.');
+        }
+        
+        $target_path = __DIR__ . '/excels/' . $file;
+        if (!file_exists($target_path)) {
+            // 자소 분리 및 인코딩 호환성을 위한 glob 백업 탐색
+            $files = glob(__DIR__ . '/excels/*.xlsx');
+            $found = false;
+            foreach ($files as $f) {
+                $base = basename($f);
+                if (function_exists('normalizer_normalize')) {
+                    if (normalizer_normalize($base, Normalizer::FORM_C) === normalizer_normalize($file, Normalizer::FORM_C) ||
+                        normalizer_normalize($base, Normalizer::FORM_D) === normalizer_normalize($file, Normalizer::FORM_D)) {
+                        $target_path = $f;
+                        $found = true;
+                        break;
+                    }
+                } else {
+                    if (strcasecmp($base, $file) === 0) {
+                        $target_path = $f;
+                        $found = true;
+                        break;
+                    }
+                }
+            }
+            if (!$found) {
+                http_response_code(404);
+                exit('엑셀 파일을 찾을 수 없습니다.');
+            }
+        }
+        
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Length: ' . filesize($target_path));
+        header('Content-Disposition: attachment; filename="' . rawurlencode(basename($target_path)) . '"');
         readfile($target_path);
         exit;
     }
@@ -1304,29 +1345,59 @@ if ($action) {
         $step_id = isset($input['step_id']) ? trim($input['step_id']) : '';
         $section_id = isset($input['section_id']) ? trim($input['section_id']) : '';
         $is_correct = isset($input['is_correct']) ? (bool)$input['is_correct'] : null;
+        $quiz_type = isset($input['quiz_type']) ? trim($input['quiz_type']) : ''; // 'theory' 또는 'journal'
+        $is_step_completed = isset($input['is_step_completed']) ? (bool)$input['is_step_completed'] : false;
         $wrong_data = isset($input['wrong_data']) ? $input['wrong_data'] : null;
         $section_pct = isset($input['section_pct']) ? min(100, max(0, (int)$input['section_pct'])) : null;
 
         $user_id = $cur_user['id'];
 
-        $updated_prog = atomic_json_modify($learning_progress_file, function($data) use ($user_id, $step_id, $section_id, $is_correct, $wrong_data, $section_pct) {
+        $updated_prog = atomic_json_modify($learning_progress_file, function($data) use ($user_id, $step_id, $section_id, $is_correct, $quiz_type, $is_step_completed, $wrong_data, $section_pct) {
             if (!is_array($data)) $data = [];
             if (!isset($data[$user_id])) {
                 $data[$user_id] = [
                     'completed_steps' => [],
+                    'correct_counts' => [],
                     'section_progress' => [],
                     'wrong_notes' => [],
                     'stats' => ['solved_count' => 0, 'correct_count' => 0]
                 ];
             }
 
-            // 스텝 완료 추가
-            if ($step_id && !in_array($step_id, $data[$user_id]['completed_steps'])) {
-                $data[$user_id]['completed_steps'][] = $step_id;
+            if (!isset($data[$user_id]['correct_counts'])) {
+                $data[$user_id]['correct_counts'] = [];
+            }
+
+            // 정답을 맞힌 경우 누적 횟수 기록
+            if ($is_correct && $step_id && $quiz_type) {
+                if (!isset($data[$user_id]['correct_counts'][$step_id])) {
+                    $data[$user_id]['correct_counts'][$step_id] = ['theory' => 0, 'journal' => 0];
+                }
+                // 기존 데이터에 필드가 없을 수 있으므로 보정
+                if (!isset($data[$user_id]['correct_counts'][$step_id]['theory'])) {
+                    $data[$user_id]['correct_counts'][$step_id]['theory'] = 0;
+                }
+                if (!isset($data[$user_id]['correct_counts'][$step_id]['journal'])) {
+                    $data[$user_id]['correct_counts'][$step_id]['journal'] = 0;
+                }
+                $data[$user_id]['correct_counts'][$step_id][$quiz_type]++;
+            }
+
+            // 프론트에서 최종 완료 판정 신호가 왔을 때만 완료 목록에 추가
+            if ($is_step_completed && $step_id) {
+                if (!isset($data[$user_id]['completed_steps'])) {
+                    $data[$user_id]['completed_steps'] = [];
+                }
+                if (!in_array($step_id, $data[$user_id]['completed_steps'])) {
+                    $data[$user_id]['completed_steps'][] = $step_id;
+                }
             }
 
             // 섹션 진도율 갱신
             if ($section_id && $section_pct !== null) {
+                if (!isset($data[$user_id]['section_progress'])) {
+                    $data[$user_id]['section_progress'] = [];
+                }
                 $data[$user_id]['section_progress'][$section_id] = $section_pct;
             }
 

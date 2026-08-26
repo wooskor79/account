@@ -1,0 +1,19 @@
+{
+    "user_6a69aaae688b451c": {
+        "completed_steps": [],
+        "section_progress": {
+            "sec_asset": 6
+        },
+        "wrong_notes": [],
+        "stats": {
+            "solved_count": 1,
+            "correct_count": 1
+        },
+        "correct_counts": {
+            "asset_01": {
+                "theory": 1,
+                "journal": 0
+            }
+        }
+    }
+}

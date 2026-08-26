@@ -225,10 +225,23 @@ function openQuizApp(mode, level = '2급') {
     document.body.classList.remove('learning-app-active');
     document.getElementById('quiz-menu-dropdown')?.classList.add('hidden');
     document.getElementById('quiz1-menu-dropdown')?.classList.add('hidden');
-    document.getElementById('main-content-view')?.classList.add('hidden');
-    document.getElementById('learning-course-view')?.classList.add('hidden');
-    if (document.getElementById('learning-course-view')) document.getElementById('learning-course-view').style.display = 'none';
-    document.getElementById('quiz-content-view')?.classList.remove('hidden');
+    
+    const mainView = document.getElementById('main-content-view');
+    const quizView = document.getElementById('quiz-content-view');
+    const learningView = document.getElementById('learning-course-view');
+
+    if (mainView) {
+        mainView.classList.add('hidden');
+        mainView.style.display = 'none';
+    }
+    if (learningView) {
+        learningView.classList.add('hidden');
+        learningView.style.display = 'none';
+    }
+    if (quizView) {
+        quizView.classList.remove('hidden');
+        quizView.style.display = ''; // 인라인 display 스타일 제거하여 복원
+    }
 
     const journalContainer = document.getElementById('journal-quiz-container');
     const theoryContainer = document.getElementById('theory-quiz-container');
@@ -322,8 +335,16 @@ function openQuizApp(mode, level = '2급') {
 
 function goHome() {
     if (window.currentViewMode === 'mobile') return;
-    document.getElementById('quiz-content-view').classList.add('hidden');
-    document.getElementById('main-content-view').classList.remove('hidden');
+    const quizView = document.getElementById('quiz-content-view');
+    const mainView = document.getElementById('main-content-view');
+    if (quizView) {
+        quizView.classList.add('hidden');
+        quizView.style.display = 'none';
+    }
+    if (mainView) {
+        mainView.classList.remove('hidden');
+        mainView.style.display = ''; // 인라인 display 스타일 제거!
+    }
 }
 
 let problemsMap = new Map(); 
@@ -653,6 +674,7 @@ let currentLoadingJournalFile = '';
 let currentLoadingTheoryFile = '';
 
 let excelWorker = new Worker('js/excel_worker.js?v=' + Date.now());
+window.excelWorker = excelWorker;
 
 excelWorker.addEventListener('message', function(e) {
     const data = e.data;
@@ -701,35 +723,22 @@ function fetchExcelFile(url = '분개문제.xlsx') {
     if (startBtn) startBtn.disabled = true;
 
     const cleanUrl = url.replace(/^excels\//, '');
-    const urlsToTry = [
-        'excels/' + encodeURI(cleanUrl),
-        'excels/' + cleanUrl,
-        encodeURI(cleanUrl),
-        cleanUrl
-    ];
+    const targetUrl = '?action=download_excel&file=' + encodeURIComponent(cleanUrl);
 
-    function tryFetch(index) {
-        if (index >= urlsToTry.length) {
-            if (status) status.innerHTML = `'${url}' 파일을 불러오지 못했습니다.`;
-            return;
-        }
-
-        const targetUrl = urlsToTry[index];
-        fetch(targetUrl)
-            .then(res => {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.arrayBuffer();
-            })
-            .then(buffer => {
-                excelWorker.postMessage({ data: buffer, type: 'journal', fileKey: url });
-            })
-            .catch(err => {
-                console.warn(`[${targetUrl}] 로드 실패, 다음 시도...`, err);
-                tryFetch(index + 1);
-            });
-    }
-
-    tryFetch(0);
+    fetch(targetUrl)
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.arrayBuffer();
+        })
+        .then(buffer => {
+            if (window.excelWorker) {
+                window.excelWorker.postMessage({ data: buffer, type: 'journal', fileKey: url });
+            }
+        })
+        .catch(err => {
+            console.error(`[${targetUrl}] 로드 실패:`, err);
+            if (status) status.innerHTML = `'${url}' 파일을 불러오지 못했습니다. (서버 통신 오류)`;
+        });
 }
 
 function handleFileSelect(e) {
@@ -770,13 +779,13 @@ async function prefetchAllQuizFiles() {
     for (const item of filesToPrefetch) {
         if (!window.quizDataCache[item.url]) {
             try {
-                let res = await fetch('excels/' + encodeURI(item.url));
-                if (!res.ok) {
-                    res = await fetch(encodeURI(item.url));
-                }
+                const targetUrl = '?action=download_excel&file=' + encodeURIComponent(item.url);
+                const res = await fetch(targetUrl);
                 if (res.ok) {
                     const buffer = await res.arrayBuffer();
-                    excelWorker.postMessage({ data: buffer, type: item.type, fileKey: item.url });
+                    if (window.excelWorker) {
+                        window.excelWorker.postMessage({ data: buffer, type: item.type, fileKey: item.url });
+                    }
                 }
             } catch (e) {
                 // 프리페치 에러는 무시

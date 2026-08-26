@@ -13,6 +13,12 @@ async function switchGrade(grade) {
     if (grade !== 'grade1' && grade !== 'grade2') grade = 'grade2';
     currentGrade = grade;
     localStorage.setItem('current_grade', grade);
+
+    // 만약 초급이동(grade2)을 눌렀는데 1급 맞춤학습이 켜져있다면 메인으로 전환
+    if (grade === 'grade2' && document.body.classList.contains('learning-app-active')) {
+        closeLearningCourseApp();
+    }
+
     updateGradeUI();
     await fetchSectionTitles();
     await fetchFiles();
@@ -743,7 +749,7 @@ function closeLearningCourseApp() {
     }
     if (mainView) {
         mainView.classList.remove('hidden');
-        mainView.style.display = 'flex';
+        mainView.style.display = ''; // 인라인 display 스타일 제거하여 CSS 레이아웃 복원
     }
 }
 
@@ -756,10 +762,13 @@ window.goHome = function() {
         learningView.classList.add('hidden');
         learningView.style.display = 'none';
     }
+    const mainView = document.getElementById('main-content-view');
+    if (mainView) {
+        mainView.style.display = ''; // 인라인 display 스타일 제거!
+    }
     if (typeof origGoHome === 'function') {
         origGoHome();
     } else {
-        const mainView = document.getElementById('main-content-view');
         const quizView = document.getElementById('quiz-content-view');
         if (quizView) {
             quizView.classList.add('hidden');
@@ -767,7 +776,6 @@ window.goHome = function() {
         }
         if (mainView) {
             mainView.classList.remove('hidden');
-            mainView.style.display = 'flex';
         }
     }
 };

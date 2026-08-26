@@ -20,6 +20,100 @@ $show_lock_gate = $is_private && !$is_admin;
     <title>학습 자료실 및 문제풀이</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    // window.alert -> 세련된 커스텀 모달로 재정의
+    (function() {
+        window.alert = function(message) {
+            let modal = document.getElementById('custom-alert-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'custom-alert-modal';
+                modal.className = 'fixed inset-0 z-[999999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4 opacity-0 pointer-events-none transition-all duration-200 ease-out';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-sm w-full text-center border border-slate-100 transform scale-95 transition-all duration-200 ease-out" id="custom-alert-card">
+                        <div class="w-14 h-14 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 shadow-inner" id="custom-alert-icon">
+                            ⚠️
+                        </div>
+                        <h3 class="text-base font-extrabold text-slate-800" id="custom-alert-title">알림</h3>
+                        <p class="text-xs sm:text-sm text-slate-500 mt-3 leading-relaxed whitespace-pre-line text-center font-medium" id="custom-alert-message"></p>
+                        <button id="custom-alert-close-btn" class="w-full mt-6 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md hover:shadow-lg transition transform active:scale-95">
+                            확인
+                        </button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                // 이벤트 리스너 등록
+                const closeBtn = modal.querySelector('#custom-alert-close-btn');
+                closeBtn.addEventListener('click', closeCustomAlert);
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) closeCustomAlert();
+                });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && !modal.classList.contains('pointer-events-none')) {
+                        closeCustomAlert();
+                    }
+                });
+            }
+
+            const msgEl = modal.querySelector('#custom-alert-message');
+            if (msgEl) {
+                let displayMsg = message;
+                if (displayMsg.startsWith('❌ ') || displayMsg.startsWith('🎉 ')) {
+                    displayMsg = displayMsg.substring(2);
+                } else if (displayMsg.startsWith('❓ ') || displayMsg.startsWith('⚠️ ')) {
+                    displayMsg = displayMsg.substring(2);
+                }
+                msgEl.textContent = displayMsg;
+            }
+
+            const iconEl = modal.querySelector('#custom-alert-icon');
+            const titleEl = modal.querySelector('#custom-alert-title');
+            
+            if (iconEl && titleEl) {
+                if (message.includes('🎉') || message.includes('축하') || message.includes('성공') || message.includes('완료') || message.includes('일치')) {
+                    iconEl.innerHTML = '🎉';
+                    iconEl.className = 'w-14 h-14 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 shadow-inner';
+                    titleEl.textContent = '성공';
+                    titleEl.className = 'text-base font-extrabold text-emerald-600';
+                } else if (message.includes('❌') || message.includes('실패') || message.includes('오류') || message.includes('않습니다') || message.includes('없습니다')) {
+                    iconEl.innerHTML = '⚠️';
+                    iconEl.className = 'w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 shadow-inner';
+                    titleEl.textContent = '알림';
+                    titleEl.className = 'text-base font-extrabold text-rose-600';
+                } else {
+                    iconEl.innerHTML = '💡';
+                    iconEl.className = 'w-14 h-14 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 shadow-inner';
+                    titleEl.textContent = '알림';
+                    titleEl.className = 'text-base font-extrabold text-slate-800';
+                }
+            }
+
+            // 모달 노출 (트랜지션)
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            const card = modal.querySelector('#custom-alert-card');
+            setTimeout(() => {
+                if (card) {
+                    card.classList.remove('scale-95');
+                    card.classList.add('scale-100');
+                }
+                modal.querySelector('#custom-alert-close-btn')?.focus();
+            }, 20);
+        };
+
+        function closeCustomAlert() {
+            const modal = document.getElementById('custom-alert-modal');
+            const card = document.getElementById('custom-alert-card');
+            if (modal) {
+                if (card) {
+                    card.classList.remove('scale-100');
+                    card.classList.add('scale-95');
+                }
+                modal.classList.add('opacity-0', 'pointer-events-none');
+            }
+        }
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>

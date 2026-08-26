@@ -916,9 +916,94 @@ function submitAnswer() {
     document.getElementById('result-screen').classList.remove('hidden');
 }
 
+/**
+ * 정밀한 계정과목 비교 및 정규화 함수
+ * - 단순 includes 부분일치로 인한 오채점(예: '단기매매증권' vs '단기매매증권평가손실') 원천 방지
+ * - 공백 및 특수기호 제거 후 정규화
+ * - 거래처명 괄호(예: 보통예금(국민은행) -> 보통예금) 스마트 정제
+ * - 판관비/제조원가 접미사 ((판)/(제)/(제조)/(판관)) 구분 처리
+ * - 감가상각누계액 / 대손충당금 등 자산차감계정 괄호 유연성 처리
+ * - 동의어 및 개정 과목 매핑 (예: 기업업무추진비 <-> 접대비)
+ */
+function normalizeAccountName(rawAcc) {
+    if (!rawAcc) return '';
+    return String(rawAcc).trim().replace(/\s+/g, '');
+}
+
+function getAccountBaseAndSuffix(acc) {
+    let raw = normalizeAccountName(acc);
+    if (!raw) return { base: '', suffix: '', targetAsset: '', raw: '' };
+
+    let suffix = '';
+    // (판), (판관), (판관비) -> '판' / (제), (제조), (공장) -> '제'
+    if (/\((판|판관|판관비)\)/.test(raw)) {
+        suffix = '판';
+        raw = raw.replace(/\((판|판관|판관비)\)/g, '');
+    } else if (/\((제|제조|제조원가|공장)\)/.test(raw)) {
+        suffix = '제';
+        raw = raw.replace(/\((제|제조|제조원가|공장)\)/g, '');
+    }
+
+    // 자산 차감 대상 괄호 처리: 감가상각누계액(건물), 대손충당금(외상매출금) 등
+    let targetAsset = '';
+    const contraMatch = raw.match(/^(대손충당금|감가상각누계액)\((.+)\)$/);
+    if (contraMatch) {
+        raw = contraMatch[1];
+        targetAsset = contraMatch[2].replace(/\s+/g, '');
+    } else {
+        // 일반적인 거래처 괄호 제거: 보통예금(국민은행) -> 보통예금, 외상매출금(대한상사) -> 외상매출금
+        const bankOrVendorMatch = raw.match(/^([^\(]+)\((.+)\)$/);
+        if (bankOrVendorMatch) {
+            const knownBase = bankOrVendorMatch[1];
+            if (knownBase.length >= 2) {
+                raw = knownBase;
+            }
+        }
+    }
+
+    // 동의어 및 개정 계정과목 정규화 (2024 개정 회계기준 접대비 -> 기업업무추진비 상호 인정)
+    if (raw === '접대비') {
+        raw = '기업업무추진비';
+    }
+
+    return { base: raw, suffix, targetAsset, originalRaw: normalizeAccountName(acc) };
+}
+
+function isAccountMatch(targetAccStr, userAccStr) {
+    const target = getAccountBaseAndSuffix(targetAccStr);
+    const user = getAccountBaseAndSuffix(userAccStr);
+
+    if (!target.base || !user.base) return false;
+
+    // 1. 기본 계정과목명 완전 일치 확인 (단순 includes 방어)
+    if (target.base !== user.base) {
+        return false;
+    }
+
+    // 2. (판) / (제) 비용 구분 접미사 일치 확인
+    // target에 '제'가 지정되어 있는데 user가 '판'으로 입력하거나 그 반대인 경우 불일치
+    if (target.suffix && user.suffix && target.suffix !== user.suffix) {
+        return false;
+    }
+    // 1급 제조원가 모드에서 target이 명확히 '제'인데 user가 '제'를 누락한 경우 불일치
+    if (target.suffix === '제' && user.suffix !== '제') {
+        if (typeof currentQuizLevel !== 'undefined' && String(currentQuizLevel).includes('1급')) {
+            return false;
+        }
+    }
+
+    // 3. 자산 차감계정의 대상 자산 확인 (예: 감가상각누계액(건물) vs 감가상각누계액(차량운반구))
+    // 둘 다 대상 자산이 명시되어 있다면 대상 자산이 일치해야 함
+    if (target.targetAsset && user.targetAsset && target.targetAsset !== user.targetAsset) {
+        return false;
+    }
+
+    return true;
+}
+
 function compareEntries(userList, targetList) {
-    const validTargets = targetList.filter(t => t.account !== '' && t.amount > 0);
-    const validUsers = userList.filter(u => u.account !== '' && u.amount > 0);
+    const validTargets = (targetList || []).filter(t => t && t.account && Number(t.amount) > 0);
+    const validUsers = (userList || []).filter(u => u && u.account && Number(u.amount) > 0);
 
     if (validTargets.length === 0 && validUsers.length === 0) return true;
     if (validUsers.length !== validTargets.length) return false;
@@ -929,10 +1014,8 @@ function compareEntries(userList, targetList) {
         let foundIndex = -1;
         for (let i = 0; i < validTargets.length; i++) {
             if (!matchedTarget[i]) {
-                let targetAcc = validTargets[i].account.replace(/\s+/g, '');
-                let userAcc = userItem.account.replace(/\s+/g, '');
-                let accMatch = (targetAcc === userAcc) || targetAcc.includes(userAcc) || userAcc.includes(targetAcc);
-                let amtMatch = (validTargets[i].amount === userItem.amount);
+                let accMatch = isAccountMatch(validTargets[i].account, userItem.account);
+                let amtMatch = (Number(validTargets[i].amount) === Number(userItem.amount));
                 if (accMatch && amtMatch) {
                     foundIndex = i;
                     break;
