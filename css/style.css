@@ -484,37 +484,37 @@ min-width: 0;
 .file-list::-webkit-scrollbar-thumb { background-color: rgba(148, 163, 184, 0.3); border-radius: 10px; }
 .file-list::-webkit-scrollbar-thumb:hover { background-color: rgba(148, 163, 184, 0.5); }
 
-/* 모던 파일 아이템 디자인 (카드 행) - 완벽한 고정 높이와 크기 보장 */
+/* 모던 파일 아이템 디자인 (카드 행) - 컴팩트하고 파일명 가독성을 극대화한 슬림 디자인 */
 .file-item { 
 background: #f8fafc; 
-border-radius: 12px; 
-padding: 0 12px; 
-height: 44px;
-min-height: 44px;
-max-height: 44px;
+border-radius: 10px; 
+padding: 0 8px; 
+height: 38px;
+min-height: 38px;
+max-height: 38px;
 flex-shrink: 0;
 display: flex; 
 justify-content: space-between; 
 align-items: center; 
-box-shadow: 0 1px 3px rgba(15, 23, 42, 0.02); 
+box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02); 
 border: 1px solid #e2e8f0; 
-transition: all 0.18s ease; 
+transition: all 0.15s ease; 
 position: relative; 
-gap: 8px;
+gap: 6px;
 min-width: 0;
 overflow: hidden;
 }
 .file-item:hover { 
 background: #ffffff;
 border-color: #93c5fd;
-box-shadow: 0 4px 12px -2px rgba(59, 130, 246, 0.12); 
+box-shadow: 0 3px 10px -2px rgba(59, 130, 246, 0.12); 
 transform: translateY(-1px);
 }
 
 .file-info-row {
 display: flex;
 align-items: center;
-gap: 8px;
+gap: 6px;
 flex: 1;
 min-width: 0;
 overflow: hidden;
@@ -523,9 +523,9 @@ overflow: hidden;
 .file-name { 
 display: inline-flex;
 align-items: center;
-gap: 6px;
-font-size: 0.88rem; 
-font-weight: 700; 
+gap: 5px;
+font-size: 0.80rem; 
+font-weight: 600; 
 color: #1e293b; 
 text-decoration: none; 
 white-space: nowrap; 
@@ -543,27 +543,29 @@ color: #3b82f6;
 white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
+min-width: 0;
+flex: 1;
 }
 .file-size-tag {
-font-size: 0.72rem;
+font-size: 0.65rem;
 font-weight: 600;
 color: #94a3b8;
 background: #ffffff;
 border: 1px solid #e2e8f0;
-padding: 1px 6px;
-border-radius: 6px;
+padding: 1px 4px;
+border-radius: 4px;
 white-space: nowrap;
 flex-shrink: 0;
 }
 
 /* 세련된 확장자 뱃지 (3D 틴트) */
 .badge-ext {
-font-size: 0.68rem;
+font-size: 0.64rem;
 font-weight: 800;
-padding: 3px 8px;
-border-radius: 6px;
+padding: 2px 5px;
+border-radius: 4px;
 text-transform: uppercase;
-letter-spacing: 0.3px;
+letter-spacing: 0.2px;
 flex-shrink: 0;
 }
 .badge-hwp { background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; }
@@ -576,49 +578,53 @@ flex-shrink: 0;
 .action-container { 
 display: flex; 
 align-items: center; 
-gap: 6px; 
+gap: 4px; 
 flex-shrink: 0;
 }
 
-/* 선명하고 또렷한 액션 버튼 */
+/* 선명하고 컴팩트한 액션 버튼 */
 .btn-view-preview {
 display: inline-flex;
 align-items: center;
-gap: 4px;
-padding: 4px 10px;
-border-radius: 8px;
-font-size: 0.75rem;
-font-weight: 700;
+gap: 2px;
+padding: 2px 7px;
+border-radius: 6px;
+font-size: 0.68rem;
+font-weight: 600;
 text-decoration: none;
 cursor: pointer;
 background: #3b82f6;
 border: 1px solid #2563eb;
 color: #ffffff;
-box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2);
 transition: all 0.15s ease;
+white-space: nowrap;
+flex-shrink: 0;
 }
 .btn-view-preview:hover {
 background: #2563eb;
 transform: translateY(-1px);
-box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
+box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 color: #ffffff;
 }
 
 .btn-download {
 display: inline-flex;
 align-items: center;
-gap: 4px;
-padding: 4px 10px;
-border-radius: 8px;
-font-size: 0.75rem;
-font-weight: 700;
+gap: 2px;
+padding: 2px 7px;
+border-radius: 6px;
+font-size: 0.68rem;
+font-weight: 600;
 text-decoration: none;
 cursor: pointer;
 background: #ffffff;
 border: 1px solid #cbd5e1;
 color: #334155;
-box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 transition: all 0.15s ease;
+white-space: nowrap;
+flex-shrink: 0;
 }
 .btn-download:hover {
 background: #f1f5f9;
@@ -659,13 +665,15 @@ margin-top: 4px;
 background-color: var(--delete-btn-bg);
 color: var(--delete-btn-text);
 border: 1px solid #fecaca;
-padding: 4px 8px;
-font-size: 0.75rem;
-font-weight: 700;
-border-radius: 6px;
+padding: 2px 6px;
+font-size: 0.68rem;
+font-weight: 600;
+border-radius: 5px;
 cursor: pointer;
 display: none;
 transition: all 0.15s;
+white-space: nowrap;
+flex-shrink: 0;
 }
 .btn-delete:hover { background-color: #fca5a5; }
 .btn-delete.active { display: inline-block; }
