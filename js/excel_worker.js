@@ -1,5 +1,43 @@
 importScripts('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
 
+function sanitizeAccountName(acc) {
+    if (!acc) return '';
+    return String(acc)
+        .replace(/현통예금/g, '보통예금')
+        .replace(/단\s+기매매증권/g, '단기매매증권')
+        .replace(/외상\s+매출금/g, '외상매출금')
+        .replace(/외상\s+매입금/g, '외상매입금')
+        .replace(/받을\s+어음/g, '받을어음')
+        .replace(/지급\s+어음/g, '지급어음')
+        .replace(/대손\s+충당금/g, '대손충당금')
+        .replace(/감가\s+상각누계액/g, '감가상각누계액')
+        .trim();
+}
+
+function sanitizeProblemText(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/현통예금/g, '보통예금')
+        .replace(/단\s+기매매증권/g, '단기매매증권')
+        .trim();
+}
+
+function extractQuizTagKey(text) {
+    if (!text) return null;
+    let match = text.match(/\[(.*?)\]/);
+    if (!match) return null;
+    let tag = match[1].replace(/\s+/g, '');
+    let roundMatch = tag.match(/(\d+)회.*?#?(\d+)/);
+    if (roundMatch) {
+        return `round_${roundMatch[1]}_${roundMatch[2]}`;
+    }
+    let sectionMatch = tag.match(/([가-힣]+).*?#?(\d+)/);
+    if (sectionMatch) {
+        return `sec_${sectionMatch[1]}_${sectionMatch[2]}`;
+    }
+    return tag;
+}
+
 self.onmessage = function(e) {
     const { data, type, fileKey } = e.data;
     try {
@@ -8,10 +46,10 @@ self.onmessage = function(e) {
 
         if (type === 'journal') {
             let probSheetName = sheetNames.find(s => s.trim() === '문제') || sheetNames.find(s => s.includes('문제')) || sheetNames[0];
-            let ansSheetName = sheetNames.find(s => s.replace(/\s+/g, '') === '정답및해설') || sheetNames.find(s => s.includes('정답') || s.includes('해설')) || sheetNames[1];
+            let ansSheetName = sheetNames.find(s => s.replace(/\s+/g, '') === '정답및해설') || sheetNames.find(s => s.includes('정답') || s.includes('해설')) || (sheetNames.length > 1 ? sheetNames[1] : sheetNames[0]);
 
             const probRows = XLSX.utils.sheet_to_json(workbook.Sheets[probSheetName], { header: 1 });
-            const ansRows = XLSX.utils.sheet_to_json(workbook.Sheets[ansSheetName], { header: 1 });
+            const ansRows = ansSheetName && workbook.Sheets[ansSheetName] ? XLSX.utils.sheet_to_json(workbook.Sheets[ansSheetName], { header: 1 }) : [];
 
             let problemsMapArr = [];
             let answersMapArr = [];
@@ -28,6 +66,7 @@ self.onmessage = function(e) {
             if (diffColIdx === -1) diffColIdx = 8;
 
             let lastProbId = null;
+            let rawProblems = [];
             for (let i = 1; i < probRows.length; i++) {
                 let row = probRows[i];
                 if (!row || row.length === 0) continue;
@@ -37,12 +76,11 @@ self.onmessage = function(e) {
                 if (!id) continue;
                 lastProbId = id;
 
-                let text = String(row[probTextColIdx] || '').trim();
+                let text = sanitizeProblemText(String(row[probTextColIdx] || ''));
                 if (text && text.length > 5) {
                     let diff = (diffColIdx !== -1 && row[diffColIdx] !== undefined && row[diffColIdx] !== null) ? String(row[diffColIdx]).trim() : '';
                     let cat = (catColIdx !== -1 && row[catColIdx] !== undefined && row[catColIdx] !== null) ? String(row[catColIdx]).trim() : '일반분개';
-                    problemsMapArr.push([id, { text: text, difficulty: diff, category: cat }]);
-                    if (!problemIds.includes(id)) problemIds.push(id);
+                    rawProblems.push({ id, text, diff, cat, tagKey: extractQuizTagKey(text) });
                 }
             }
 
@@ -64,6 +102,7 @@ self.onmessage = function(e) {
 
             let lastAnsId = null;
             let tempAnswers = {};
+            let tagToAnswer = {};
 
             for (let i = 1; i < ansRows.length; i++) {
                 let row = ansRows[i];
@@ -91,7 +130,7 @@ self.onmessage = function(e) {
                 let rawExp = (expColIdx !== -1 && row[expColIdx] !== undefined) ? String(row[expColIdx]).trim() : '';
 
                 if (rawDebitAcc) {
-                    let accList = rawDebitAcc.split('\n').map(s => s.trim()).filter(Boolean);
+                    let accList = rawDebitAcc.split('\n').map(s => sanitizeAccountName(s)).filter(Boolean);
                     let amtList = rawDebitAmt.split('\n').map(s => s.trim()).filter(Boolean);
                     accList.forEach((acc, idx) => {
                         let amtStr = (amtList[idx] || '0').replace(/[,원\s]/g, '');
@@ -102,7 +141,7 @@ self.onmessage = function(e) {
                 }
 
                 if (rawCreditAcc) {
-                    let accList = rawCreditAcc.split('\n').map(s => s.trim()).filter(Boolean);
+                    let accList = rawCreditAcc.split('\n').map(s => sanitizeAccountName(s)).filter(Boolean);
                     let amtList = rawCreditAmt.split('\n').map(s => s.trim()).filter(Boolean);
                     accList.forEach((acc, idx) => {
                         let amtStr = (amtList[idx] || '0').replace(/[,원\s]/g, '');
@@ -113,13 +152,20 @@ self.onmessage = function(e) {
                 }
 
                 if (rawExp && !ansObj.explanation.includes(rawExp)) {
-                    ansObj.explanation += (ansObj.explanation ? ' ' : '') + rawExp;
+                    ansObj.explanation += (ansObj.explanation ? ' ' : '') + sanitizeProblemText(rawExp);
+                    let ansTag = extractQuizTagKey(rawExp);
+                    if (ansTag) tagToAnswer[ansTag] = ansObj;
                 }
             }
 
-            for (let id in tempAnswers) {
-                answersMapArr.push([id, tempAnswers[id]]);
-            }
+            rawProblems.forEach(p => {
+                let ans = (p.tagKey && tagToAnswer[p.tagKey]) ? tagToAnswer[p.tagKey] : tempAnswers[p.id];
+                if (ans) {
+                    problemsMapArr.push([p.id, { text: p.text, difficulty: p.diff, category: p.cat }]);
+                    answersMapArr.push([p.id, ans]);
+                    if (!problemIds.includes(p.id)) problemIds.push(p.id);
+                }
+            });
 
             self.postMessage({
                 success: true,
@@ -166,6 +212,7 @@ self.onmessage = function(e) {
             if (diffColIdx === -1) diffColIdx = 6;
 
             let lastProbId = null;
+            let rawTheoryProblems = [];
             for (let i = 1; i < probRows.length; i++) {
                 let row = probRows[i];
                 if (!row || row.length === 0) continue;
@@ -175,18 +222,17 @@ self.onmessage = function(e) {
                 if (!id) continue;
                 lastProbId = id;
 
-                let text = String(row[probTextColIdx] || '').trim();
+                let text = sanitizeProblemText(String(row[probTextColIdx] || ''));
                 if (text) {
                     let choices = [
-                        choice1Idx !== -1 && row[choice1Idx] !== undefined && row[choice1Idx] !== null ? String(row[choice1Idx]).trim() : '',
-                        choice2Idx !== -1 && row[choice2Idx] !== undefined && row[choice2Idx] !== null ? String(row[choice2Idx]).trim() : '',
-                        choice3Idx !== -1 && row[choice3Idx] !== undefined && row[choice3Idx] !== null ? String(row[choice3Idx]).trim() : '',
-                        choice4Idx !== -1 && row[choice4Idx] !== undefined && row[choice4Idx] !== null ? String(row[choice4Idx]).trim() : ''
+                        choice1Idx !== -1 && row[choice1Idx] !== undefined && row[choice1Idx] !== null ? sanitizeProblemText(String(row[choice1Idx])) : '',
+                        choice2Idx !== -1 && row[choice2Idx] !== undefined && row[choice2Idx] !== null ? sanitizeProblemText(String(row[choice2Idx])) : '',
+                        choice3Idx !== -1 && row[choice3Idx] !== undefined && row[choice3Idx] !== null ? sanitizeProblemText(String(row[choice3Idx])) : '',
+                        choice4Idx !== -1 && row[choice4Idx] !== undefined && row[choice4Idx] !== null ? sanitizeProblemText(String(row[choice4Idx])) : ''
                     ];
                     let diff = (diffColIdx !== -1 && row[diffColIdx] !== undefined && row[diffColIdx] !== null) ? String(row[diffColIdx]).trim() : '';
                     let cat = (catColIdx !== -1 && row[catColIdx] !== undefined && row[catColIdx] !== null) ? String(row[catColIdx]).trim() : '회계이론';
-                    theoryProblemsMapArr.push([id, { text, choices, difficulty: diff, category: cat }]);
-                    if (!theoryProblemIds.includes(id)) theoryProblemIds.push(id);
+                    rawTheoryProblems.push({ id, text, choices, diff, cat, tagKey: extractQuizTagKey(text) });
                 }
             }
 
@@ -202,6 +248,7 @@ self.onmessage = function(e) {
 
             let lastAnsId = null;
             let tempTheoryAnswers = {};
+            let tagToTheoryAnswer = {};
 
             for (let i = 1; i < ansRows.length; i++) {
                 let row = ansRows[i];
@@ -231,13 +278,21 @@ self.onmessage = function(e) {
                 }
 
                 if (expVal && !ansObj.explanation.includes(expVal)) {
-                    ansObj.explanation += (ansObj.explanation ? ' ' : '') + expVal;
+                    let cleanExp = sanitizeProblemText(expVal);
+                    ansObj.explanation += (ansObj.explanation ? ' ' : '') + cleanExp;
+                    let ansTag = extractQuizTagKey(cleanExp);
+                    if (ansTag) tagToTheoryAnswer[ansTag] = ansObj;
                 }
             }
-            
-            for (let id in tempTheoryAnswers) {
-                theoryAnswersMapArr.push([id, tempTheoryAnswers[id]]);
-            }
+
+            rawTheoryProblems.forEach(p => {
+                let ans = (p.tagKey && tagToTheoryAnswer[p.tagKey]) ? tagToTheoryAnswer[p.tagKey] : tempTheoryAnswers[p.id];
+                if (ans && ans.answer) {
+                    theoryProblemsMapArr.push([p.id, { text: p.text, choices: p.choices, difficulty: p.diff, category: p.cat }]);
+                    theoryAnswersMapArr.push([p.id, ans]);
+                    if (!theoryProblemIds.includes(p.id)) theoryProblemIds.push(p.id);
+                }
+            });
 
             self.postMessage({
                 success: true,
