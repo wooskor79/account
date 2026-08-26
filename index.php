@@ -276,16 +276,16 @@ $show_lock_gate = $is_private && !$is_admin;
     <div id="quiz-content-view" class="hidden flex-grow flex items-center justify-center p-4 bg-[#fdfbf7] overflow-y-auto" style="min-height: calc(100vh - 85px);">
         
         <!-- 1. 분개문제풀기 컨테이너 -->
-        <div id="journal-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-4 sm:p-7 md:p-8 border border-amber-100 my-auto hidden relative">
+        <div id="journal-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-4 sm:p-7 md:p-8 border border-amber-100 my-auto hidden relative z-10">
             
-            <header class="flex items-center justify-between gap-1 sm:gap-2 mb-2 sm:mb-4 min-h-[38px] sm:min-h-[48px]">
+            <div class="flex items-center justify-between gap-1 sm:gap-2 mb-2 sm:mb-4 min-h-[36px] sm:min-h-[44px]">
                 <div class="flex items-center flex-shrink-0 min-w-0 lg:min-w-[110px]">
-                    <button onclick="goHome()" class="hidden lg:inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl transition font-medium whitespace-nowrap shadow-xs">
+                    <button onclick="goHome()" class="hidden lg:inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-xl transition font-medium whitespace-nowrap shadow-xs">
                         🏠 홈으로 돌아가기
                     </button>
                 </div>
                 
-                <div class="flex-1 flex items-center justify-center min-h-[36px] sm:min-h-[44px] px-1 overflow-hidden">
+                <div class="flex-1 flex items-center justify-center min-h-[32px] sm:min-h-[38px] px-1 overflow-hidden">
                     <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 text-center leading-snug break-keep line-clamp-2 max-w-full m-0">2급분개</h1>
                 </div>
 
@@ -295,10 +295,10 @@ $show_lock_gate = $is_private && !$is_admin;
                         <button onclick="jumpToJournalProblem()" class="bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold px-2 py-0.5 rounded-lg ml-1 transition">이동</button>
                     </div>
                 </div>
-            </header>
+            </div>
 
             <!-- 분개 Start Screen -->
-            <div id="start-screen" class="text-center py-2 sm:py-4 space-y-3">
+            <div id="start-screen" class="text-center py-2 sm:py-3 space-y-3">
                 <div class="bg-amber-50/80 rounded-2xl p-4 sm:p-5 border border-amber-200 text-slate-800 shadow-sm max-w-md mx-auto">
                     <label for="quiz-user-name" class="block text-xs sm:text-sm font-bold text-amber-900 mb-1.5">
                         👤 사용자 이름을 적어주세요
@@ -394,16 +394,16 @@ $show_lock_gate = $is_private && !$is_admin;
         </div>
 
         <!-- 2. 필기문제풀기 컨테이너 -->
-        <div id="theory-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-4 sm:p-7 md:p-8 border border-emerald-100 my-auto hidden relative">
+        <div id="theory-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-4 sm:p-7 md:p-8 border border-emerald-100 my-auto hidden relative z-10">
             
-            <header class="flex items-center justify-between gap-1 sm:gap-2 mb-2 sm:mb-4 min-h-[38px] sm:min-h-[48px]">
+            <div class="flex items-center justify-between gap-1 sm:gap-2 mb-2 sm:mb-4 min-h-[36px] sm:min-h-[44px]">
                 <div class="flex items-center flex-shrink-0 min-w-0 lg:min-w-[110px]">
-                    <button onclick="goHome()" class="hidden lg:inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl transition font-medium whitespace-nowrap shadow-xs">
+                    <button onclick="goHome()" class="hidden lg:inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-xl transition font-medium whitespace-nowrap shadow-xs">
                         🏠 홈으로 돌아가기
                     </button>
                 </div>
                 
-                <div class="flex-1 flex items-center justify-center min-h-[36px] sm:min-h-[44px] px-1 overflow-hidden">
+                <div class="flex-1 flex items-center justify-center min-h-[32px] sm:min-h-[38px] px-1 overflow-hidden">
                     <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 text-center leading-snug break-keep line-clamp-2 max-w-full m-0">2급필기</h1>
                 </div>
 
@@ -413,10 +413,10 @@ $show_lock_gate = $is_private && !$is_admin;
                         <button onclick="jumpToTheoryProblem()" class="bg-emerald-200 hover:bg-emerald-300 text-emerald-900 font-bold px-2 py-0.5 rounded-lg ml-1 transition">이동</button>
                     </div>
                 </div>
-            </header>
+            </div>
 
             <!-- 필기 Start Screen -->
-            <div id="theory-start-screen" class="text-center py-2 sm:py-4 space-y-3">
+            <div id="theory-start-screen" class="text-center py-2 sm:py-3 space-y-3">
                 <div class="bg-emerald-50/80 rounded-2xl p-4 sm:p-5 border border-emerald-200 text-slate-800 shadow-sm max-w-md mx-auto">
                     <label for="theory-quiz-user-name" class="block text-xs sm:text-sm font-bold text-emerald-900 mb-1.5">
                         👤 사용자 이름을 적어주세요

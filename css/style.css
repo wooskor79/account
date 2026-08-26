@@ -56,7 +56,7 @@ flex-direction: column;
 padding: 12px 18px;
 }
 
-header {
+body > header {
 display: flex;
 justify-content: space-between;
 align-items: center;
@@ -70,7 +70,7 @@ border: 1px solid rgba(255, 255, 255, 0.9);
 margin-bottom: 12px;
 flex-shrink: 0;
 position: relative;
-z-index: 1000;
+z-index: 999999;
 }
 
 .logo-section {
@@ -1299,12 +1299,14 @@ body { height: auto; overflow-y: auto; }
     }
     #quiz-content-view {
         display: flex !important;
+        position: relative;
+        z-index: 1;
     }
     
-    header {
+    body > header {
         padding: 10px 16px;
         position: relative;
-        z-index: 1000;
+        z-index: 999999;
     }
     .logo-section {
         flex-direction: row;
