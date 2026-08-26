@@ -224,8 +224,9 @@ function openQuizApp(mode, level = '2급') {
 
     document.getElementById('quiz-menu-dropdown')?.classList.add('hidden');
     document.getElementById('quiz1-menu-dropdown')?.classList.add('hidden');
-    document.getElementById('main-content-view').classList.add('hidden');
-    document.getElementById('quiz-content-view').classList.remove('hidden');
+    document.getElementById('main-content-view')?.classList.add('hidden');
+    document.getElementById('learning-course-view')?.classList.add('hidden');
+    document.getElementById('quiz-content-view')?.classList.remove('hidden');
 
     const journalContainer = document.getElementById('journal-quiz-container');
     const theoryContainer = document.getElementById('theory-quiz-container');

@@ -698,18 +698,41 @@ function cancelPaste() {
     pastedImageData = null;
 }
 
-async function savePastedImage() {
-    const filename = document.getElementById('paste-filename').value.trim();
-    if (!filename) { alert('저장할 파일명을 입력하세요.'); return; }
-    try {
-        const res = await fetch('?action=upload_drawing', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: pastedImageData, filename: filename, grade: currentGrade })
-        });
-        if (res.ok) { cancelPaste(); await fetchFiles(); }
-        else alert('그림 저장 실패');
-    } catch (err) { console.error(err); alert('서버 통신 오류'); }
+// --- 1급 맞춤 코스 학습 (Learning Course) 뷰 전환 라우팅 ---
+function openLearningCourseApp() {
+    const mainView = document.getElementById('main-content-view');
+    const quizView = document.getElementById('quiz-content-view');
+    const learningView = document.getElementById('learning-course-view');
+
+    if (mainView) mainView.classList.add('hidden');
+    if (quizView) quizView.classList.add('hidden');
+    if (learningView) learningView.classList.remove('hidden');
+
+    if (window.LearningEngine && typeof window.LearningEngine.initLearningApp === 'function') {
+        window.LearningEngine.initLearningApp();
+    }
 }
+
+function closeLearningCourseApp() {
+    const mainView = document.getElementById('main-content-view');
+    const learningView = document.getElementById('learning-course-view');
+    if (learningView) learningView.classList.add('hidden');
+    if (mainView) mainView.classList.remove('hidden');
+}
+
+// goHome 글로벌 확장 (학습 뷰도 함께 닫고 메인으로)
+const origGoHome = window.goHome;
+window.goHome = function() {
+    const learningView = document.getElementById('learning-course-view');
+    if (learningView) learningView.classList.add('hidden');
+    if (typeof origGoHome === 'function') {
+        origGoHome();
+    } else {
+        const mainView = document.getElementById('main-content-view');
+        const quizView = document.getElementById('quiz-content-view');
+        if (quizView) quizView.classList.add('hidden');
+        if (mainView) mainView.classList.remove('hidden');
+    }
+};
 
 window.onload = init;

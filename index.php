@@ -83,6 +83,11 @@ $show_lock_gate = $is_private && !$is_admin;
                 💻 PC화면
             </button>
 
+            <!-- 1급 맞춤 학습하기 전용 진입 버튼 -->
+            <button id="learning-course-nav-btn" onclick="openLearningCourseApp()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] sm:text-xs font-extrabold px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center gap-1.5 ml-2" title="2026 PERFECT 전산회계 1급 교재 기반 맞춤 코스 학습">
+                📖 1급 맞춤학습
+            </button>
+
             <div class="header-links" style="align-items: center; display: flex; margin-left: auto;">
                 <div class="relative inline-block z-[1001]" id="quiz-dropdown-wrapper">
                     <!-- 급수에 따라 텍스트 및 색상이 동적 변경되는 단일 문제풀이 버튼 -->
@@ -547,6 +552,11 @@ $show_lock_gate = $is_private && !$is_admin;
         </div>
     </div>
 
+    <!-- 1급 맞춤 코스 학습 (Learning Course) 전용 뷰 -->
+    <div id="learning-course-view" class="hidden page-wrapper max-w-7xl mx-auto px-3 sm:px-6 py-4">
+        <div id="learning-content-container"></div>
+    </div>
+
     <!-- 통합 문서 & 그림 미리보기 모달 (PDF, XLSX, HWP/HWPX, IMAGE) -->
     <div id="doc-preview-modal" class="modal-overlay" style="display:none;" onclick="closePreviewModal(event)">
         <div class="doc-modal-content" id="doc-modal-content" onclick="event.stopPropagation()">
@@ -618,6 +628,11 @@ $show_lock_gate = $is_private && !$is_admin;
     <script src="js/quiz/quiz_core.js?v=<?php echo time(); ?>"></script>
     <script src="js/quiz/quiz_journal.js?v=<?php echo time(); ?>"></script>
     <script src="js/quiz/quiz_theory.js?v=<?php echo time(); ?>"></script>
+    <!-- 1급 맞춤 코스 학습 모듈 -->
+    <script src="js/learning/learning_curriculum.js?v=<?php echo time(); ?>"></script>
+    <script src="js/learning/learning_auth.js?v=<?php echo time(); ?>"></script>
+    <script src="js/learning/learning_wrong_notes.js?v=<?php echo time(); ?>"></script>
+    <script src="js/learning/learning_engine.js?v=<?php echo time(); ?>"></script>
     <script src="js/main.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
