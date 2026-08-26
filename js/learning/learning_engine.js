@@ -175,11 +175,30 @@ window.LearningEngine = (function() {
         if (modal) modal.style.display = 'none';
     }
 
-    async function confirmLogout() {
-        const modal = document.getElementById('learning-logout-modal');
-        if (modal) modal.style.display = 'none';
-        await window.LearningAuth.logout();
-        renderAuthView('login');
+    function resumeLastLearning() {
+        const saved = localStorage.getItem('last_learning_pos');
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                if (data.sectionId) {
+                    openSection(data.sectionId, data.stepIdx || 0);
+                    return;
+                }
+            } catch(e) {}
+        }
+
+        // 저장된 위치가 없으면 첫 번째 미완료 단계 찾기
+        const prog = window.LearningAuth.getProgress() || {};
+        const curriculum = window.LearningCurriculum;
+        for (let sec of curriculum.sections) {
+            for (let idx = 0; idx < sec.steps.length; idx++) {
+                if (!(prog.completed_steps || []).includes(sec.steps[idx].id)) {
+                    openSection(sec.id, idx);
+                    return;
+                }
+            }
+        }
+        openSection(curriculum.sections[0].id, 0);
     }
 
     // --- 2. 학습자 대시보드 화면 ---
@@ -190,6 +209,13 @@ window.LearningEngine = (function() {
         const user = window.LearningAuth.getUser();
         const prog = window.LearningAuth.getProgress() || {};
         const curriculum = window.LearningCurriculum;
+
+        // 마지막 학습 위치 조회
+        let lastPosInfo = null;
+        try {
+            const saved = localStorage.getItem('last_learning_pos');
+            if (saved) lastPosInfo = JSON.parse(saved);
+        } catch(e) {}
 
         // 전체 진도율 계산
         let totalSteps = 0;
@@ -215,13 +241,19 @@ window.LearningEngine = (function() {
                                 🎓
                             </div>
                             <div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <h2 class="text-xl font-extrabold text-slate-800">
                                         ${escapeHtml(user ? user.username : '학습자')}님의 학습 공간
                                     </h2>
                                     <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
                                         전산회계 1급
                                     </span>
+                                    <!-- 마지막 학습한 곳으로 이동 버튼 -->
+                                    <button class="btn-resume-last-learning" onclick="LearningEngine.resumeLastLearning()" title="마지막으로 공부하던 위치로 즉시 이동합니다">
+                                        <span class="pulse-dot"></span>
+                                        <span>🚀 마지막 학습한 곳으로 이동</span>
+                                        ${lastPosInfo && lastPosInfo.stepTitle ? `<span class="last-step-name">(${escapeHtml(lastPosInfo.stepTitle.replace(/^[0-9.]+\s*/, ''))})</span>` : ''}
+                                    </button>
                                 </div>
                                 <p class="text-xs text-slate-500 font-medium mt-0.5">
                                     📖 기반 교재: <strong>${escapeHtml(curriculum.bookTitle)}</strong>
@@ -363,6 +395,16 @@ window.LearningEngine = (function() {
         const currentStep = section.steps[currentStepIdx] || section.steps[0];
         const prog = window.LearningAuth.getProgress() || {};
         const isStepCompleted = (prog.completed_steps || []).includes(currentStep.id);
+
+        // 마지막 학습 위치 로컬에 저장
+        try {
+            localStorage.setItem('last_learning_pos', JSON.stringify({
+                sectionId: sectionId,
+                stepIdx: stepIdx,
+                sectionTitle: section.title,
+                stepTitle: currentStep.title
+            }));
+        } catch(e) {}
 
         container.innerHTML = `
             <div class="learning-study-view">
@@ -729,6 +771,7 @@ window.LearningEngine = (function() {
         showLogoutModal,
         closeLogoutModal,
         confirmLogout,
+        resumeLastLearning,
         renderDashboard,
         openSection,
         selectOption,

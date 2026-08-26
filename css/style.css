@@ -1509,6 +1509,71 @@ body { height: auto; overflow-y: auto; }
     font-weight: 800;
     border-radius: 9999px;
 }
+/* 1급 맞춤 학습 뷰 스크롤 및 전체 높이 컨테이너 */
+#learning-course-view {
+    flex: 1;
+    overflow-y: auto !important;
+    overflow-x: hidden;
+    height: calc(100vh - 75px);
+    max-height: calc(100vh - 75px);
+    padding-bottom: 80px;
+    -webkit-overflow-scrolling: touch;
+}
+#learning-course-view::-webkit-scrollbar {
+    width: 8px;
+}
+#learning-course-view::-webkit-scrollbar-track {
+    background: rgba(241, 245, 249, 0.6);
+    border-radius: 4px;
+}
+#learning-course-view::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+#learning-course-view::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* 마지막 학습 위치 이어하기 버튼 */
+.btn-resume-last-learning {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    color: #ffffff;
+    border: 1px solid #334155;
+    border-radius: 9999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+    transition: all 0.2s ease;
+}
+.btn-resume-last-learning:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+.btn-resume-last-learning .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: #38bdf8;
+    box-shadow: 0 0 6px #38bdf8;
+    animation: pulseGlow 1.5s infinite;
+}
+@keyframes pulseGlow {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.75); }
+}
+.btn-resume-last-learning .last-step-name {
+    color: #93c5fd;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
 .btn-learning-logout-text {
     display: inline-flex;
     align-items: center;
