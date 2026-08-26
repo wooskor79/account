@@ -713,9 +713,18 @@ function openLearningCourseApp() {
     const quizView = document.getElementById('quiz-content-view');
     const learningView = document.getElementById('learning-course-view');
 
-    if (mainView) mainView.classList.add('hidden');
-    if (quizView) quizView.classList.add('hidden');
-    if (learningView) learningView.classList.remove('hidden');
+    if (mainView) {
+        mainView.classList.add('hidden');
+        mainView.style.display = 'none';
+    }
+    if (quizView) {
+        quizView.classList.add('hidden');
+        quizView.style.display = 'none';
+    }
+    if (learningView) {
+        learningView.classList.remove('hidden');
+        learningView.style.display = 'block';
+    }
 
     if (window.LearningEngine && typeof window.LearningEngine.initLearningApp === 'function') {
         window.LearningEngine.initLearningApp();
@@ -725,22 +734,37 @@ function openLearningCourseApp() {
 function closeLearningCourseApp() {
     const mainView = document.getElementById('main-content-view');
     const learningView = document.getElementById('learning-course-view');
-    if (learningView) learningView.classList.add('hidden');
-    if (mainView) mainView.classList.remove('hidden');
+    if (learningView) {
+        learningView.classList.add('hidden');
+        learningView.style.display = 'none';
+    }
+    if (mainView) {
+        mainView.classList.remove('hidden');
+        mainView.style.display = 'flex';
+    }
 }
 
 // goHome 글로벌 확장 (학습 뷰도 함께 닫고 메인으로)
 const origGoHome = window.goHome;
 window.goHome = function() {
     const learningView = document.getElementById('learning-course-view');
-    if (learningView) learningView.classList.add('hidden');
+    if (learningView) {
+        learningView.classList.add('hidden');
+        learningView.style.display = 'none';
+    }
     if (typeof origGoHome === 'function') {
         origGoHome();
     } else {
         const mainView = document.getElementById('main-content-view');
         const quizView = document.getElementById('quiz-content-view');
-        if (quizView) quizView.classList.add('hidden');
-        if (mainView) mainView.classList.remove('hidden');
+        if (quizView) {
+            quizView.classList.add('hidden');
+            quizView.style.display = 'none';
+        }
+        if (mainView) {
+            mainView.classList.remove('hidden');
+            mainView.style.display = 'flex';
+        }
     }
 };
 

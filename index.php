@@ -553,7 +553,7 @@ $show_lock_gate = $is_private && !$is_admin;
     </div>
 
     <!-- 1급 맞춤 코스 학습 (Learning Course) 전용 뷰 -->
-    <div id="learning-course-view" class="hidden page-wrapper max-w-7xl mx-auto px-3 sm:px-6 py-4">
+    <div id="learning-course-view" class="hidden max-w-7xl mx-auto px-3 sm:px-6 py-4">
         <div id="learning-content-container"></div>
     </div>
 
