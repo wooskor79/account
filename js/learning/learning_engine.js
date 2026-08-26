@@ -552,7 +552,7 @@ window.LearningEngine = (function() {
     }
 
     // --- 3. 단원 상세 학습 뷰 (이론 ➜ 퀴즈 ➜ 피드백) ---
-    function openSection(sectionId, stepIdx = 0) {
+    function openSection(sectionId, stepIdx = 0, phase = 'theory') {
         currentSectionId = sectionId;
         currentStepIdx = stepIdx;
         currentExtraQuiz = null;
@@ -569,25 +569,43 @@ window.LearningEngine = (function() {
         if (!section) return;
 
         const currentStep = section.steps[currentStepIdx] || section.steps[0];
-        const prog = window.LearningAuth.getProgress() || {};
-        const isStepCompleted = (prog.completed_steps || []).includes(currentStep.id);
+        
+        if (window.LearningGenerator && typeof window.LearningGenerator.generateDynamicQuiz === 'function') {
+            if (currentStep.quiz) {
+                const dynTheory = window.LearningGenerator.generateDynamicQuiz(null, sectionId, 'theory');
+                if (dynTheory) currentStep.quiz = dynTheory;
+            }
+            if (currentStep.journalQuiz) {
+                const dynJournal = window.LearningGenerator.generateDynamicQuiz(null, sectionId, 'journal');
+                if (dynJournal) currentStep.journalQuiz = dynJournal;
+            }
+        }
 
+        const prog = window.LearningAuth.getProgress() || {};
+        
         try {
             localStorage.setItem('last_learning_pos', JSON.stringify({
                 sectionId: sectionId,
                 stepIdx: stepIdx,
+                phase: phase,
                 sectionTitle: section.title,
                 stepTitle: currentStep.title
             }));
         } catch(e) {}
 
-        const counts = (prog.correct_counts && prog.correct_counts[currentStep.id]) || { theory: 0, journal: 0 };
+        const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
         const tCorrect = counts.theory || 0;
         const jCorrect = counts.journal || 0;
 
-        container.innerHTML = `
+        let hasTheory = section.steps.some(st => st.quiz);
+        let hasJournal = section.steps.some(st => st.journalQuiz);
+        const targetT = hasTheory ? 6 : 0;
+        const targetJ = hasJournal ? 6 : 0;
+
+        const isLastStep = currentStepIdx === section.steps.length - 1;
+
+        let uiHtml = `
             <div class="learning-study-view">
-                <!-- 상단 네비 바 -->
                 <div class="study-nav-bar">
                     <button class="btn-learning-back" onclick="LearningEngine.renderDashboard()">
                         <i class="fa-solid fa-arrow-left"></i> 대시보드로
@@ -595,62 +613,55 @@ window.LearningEngine = (function() {
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-bold text-slate-500">${escapeHtml(section.title)}</span>
                         <span class="text-xs text-slate-300">/</span>
-                        <span class="text-xs font-extrabold text-blue-600">${currentStepIdx + 1}단계 (총 ${section.steps.length}단계)</span>
+                        <span class="text-xs font-extrabold text-blue-600">${phase === 'theory' ? `${currentStepIdx + 1}번째 요약 (총 ${section.steps.length}개)` : '단원 통합 문제 풀기'}</span>
                     </div>
                     <button class="btn-learning-wrong-notes text-xs" onclick="LearningWrongNotes.renderWrongNotesView(document.getElementById('learning-content-container'))">
                         오답노트
                     </button>
                 </div>
+        `;
 
-                <!-- 단계별 탭 네비게이터 -->
-                <div class="step-nav-tabs mt-3">
-                    ${section.steps.map((st, sIdx) => {
-                        const isDone = (prog.completed_steps || []).includes(st.id);
-                        const isCur = sIdx === currentStepIdx;
-                        return `
-                            <button class="step-tab-btn ${isCur ? 'active' : ''} ${isDone ? 'done' : ''}" onclick="LearningEngine.openSection('${section.id}', ${sIdx})">
-                                <span class="step-num">${isDone ? '✓' : (sIdx + 1)}</span>
-                                <span class="step-title-text">${escapeHtml(st.title)}</span>
-                            </button>
-                        `;
-                    }).join('')}
-                </div>
-
-                <!-- 완수 목표 현황 보드 -->
+        if (phase === 'quiz') {
+            uiHtml += `
                 <div class="mt-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row justify-between gap-3 text-xs">
                     <div class="flex items-start sm:items-center gap-1.5">
-                        <span class="font-extrabold text-slate-800 flex items-center gap-1 flex-shrink-0">🎯 단계 완수 조건:</span>
-                        <span class="text-slate-500 font-semibold leading-relaxed">각 유형별로 최소 3문제를 맞추면 이 단계가 완수됩니다.</span>
+                        <span class="font-extrabold text-slate-800 flex items-center gap-1 flex-shrink-0">🎯 단원 완수 조건:</span>
+                        <span class="text-slate-500 font-semibold leading-relaxed">이 단원에서 각 유형별로 최소 6문제를 맞추면 완수됩니다.</span>
                     </div>
                     <div class="flex gap-2.5 font-bold flex-wrap items-center mt-1 sm:mt-0" id="step-target-board">
-                        ${currentStep.quiz ? `
-                            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${tCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                        ${hasTheory ? `
+                            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${tCorrect >= targetT ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
                                 <span>📝 필기:</span>
-                                <strong class="text-xs font-mono">${tCorrect}/3회</strong>
-                                ${tCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - tCorrect}문제 더 필요)</span>`}
+                                <strong class="text-xs font-mono">${tCorrect}/${targetT}회</strong>
+                                ${tCorrect >= targetT ? '<span class="text-[11px] font-extrabold text-emerald-600">완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${targetT - tCorrect}문제 더 필요)</span>`}
                             </span>
                         ` : ''}
-                        ${currentStep.journalQuiz ? `
-                            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${jCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
-                                <span>⚖️ 분개:</span>
-                                <strong class="text-xs font-mono">${jCorrect}/3회</strong>
-                                ${jCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - jCorrect}문제 더 필요)</span>`}
+                        ${hasJournal ? `
+                            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${jCorrect >= targetJ ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                                <span>🧾 분개:</span>
+                                <strong class="text-xs font-mono">${jCorrect}/${targetJ}회</strong>
+                                ${jCorrect >= targetJ ? '<span class="text-[11px] font-extrabold text-emerald-600">완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${targetJ - jCorrect}문제 더 필요)</span>`}
                             </span>
                         ` : ''}
                     </div>
                 </div>
+            `;
+        }
 
-                <!-- 학습 본문 카드 -->
+        uiHtml += `
                 <div class="study-card-container mt-4">
-                    <!-- 1. 핵심 이론 카드 -->
+        `;
+
+        if (phase === 'theory') {
+            uiHtml += `
                     <div class="theory-study-card">
                         <div class="theory-card-header">
                             <div class="flex items-center gap-2">
-                                <span class="text-lg">📖</span>
+                                <span class="text-lg">💡</span>
                                 <h3 class="text-base font-extrabold text-slate-900">${escapeHtml(currentStep.title)}</h3>
                             </div>
                             <div class="book-ref-tag">
-                                📚 ${escapeHtml(currentStep.bookRef)}
+                                📖 ${escapeHtml(currentStep.bookRef)}
                             </div>
                         </div>
 
@@ -675,27 +686,40 @@ window.LearningEngine = (function() {
                             ` : ''}
                         </div>
                     </div>
-
-                    <!-- 2. 실전 체크 퀴즈 (객관식 필기) -->
-                    ${currentStep.quiz ? `
+                    
+                    <div class="flex justify-end mt-4">
+                        ${isLastStep ? `
+                            <button class="btn-quiz-submit font-bold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md py-3 px-5 rounded-xl transition text-xs" onclick="LearningEngine.openSection('${section.id}', 0, 'quiz')">
+                                이 단원 문제 풀기 ➜
+                            </button>
+                        ` : `
+                            <button class="btn-quiz-submit font-bold bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white shadow-md py-3 px-5 rounded-xl transition text-xs" onclick="LearningEngine.openSection('${section.id}', ${currentStepIdx + 1}, 'theory')">
+                                다음 요약 보기 ➜
+                            </button>
+                        `}
+                    </div>
+            `;
+        } else if (phase === 'quiz') {
+            uiHtml += `
+                    ${hasTheory ? `
                         <div class="practice-quiz-card mt-5" id="learning-theory-quiz-card">
                             <div class="quiz-card-header">
-                                <span class="badge-quiz-type theory">실전 필기 체크</span>
-                                <h4 class="text-sm font-extrabold text-slate-800">이론 확인 문제</h4>
+                                <span class="badge-quiz-type theory">단원 필기 확인</span>
+                                <h4 class="text-sm font-extrabold text-slate-800">단원 통합 필기 문제</h4>
                             </div>
 
                             <div class="quiz-question-text mt-3" id="l-theory-question">
-                                ${formatTheoryQuestionHtml(currentStep.quiz.question)}
+                                ${formatTheoryQuestionHtml(currentStep.quiz ? currentStep.quiz.question : '')}
                             </div>
 
                             <div class="quiz-options-list mt-3" id="quiz-options-group">
-                                ${currentStep.quiz.options.map((opt, oIdx) => `
+                                ${currentStep.quiz ? currentStep.quiz.options.map((opt, oIdx) => `
                                     <label class="quiz-option-item" onclick="LearningEngine.selectOption(${oIdx + 1})">
                                         <input type="radio" name="learning_opt" value="${oIdx + 1}">
                                         <span class="opt-num">${oIdx + 1}</span>
                                         <span class="opt-text">${formatTheoryOptionHtml(opt)}</span>
                                     </label>
-                                `).join('')}
+                                `).join('') : ''}
                             </div>
 
                             <div id="quiz-feedback-box" class="quiz-feedback-container hidden mt-4"></div>
@@ -708,19 +732,17 @@ window.LearningEngine = (function() {
                         </div>
                     ` : ''}
 
-                    <!-- 3. 실전 분개 퀴즈 -->
-                    ${currentStep.journalQuiz ? `
+                    ${hasJournal ? `
                         <div class="practice-quiz-card mt-5 journal-type" id="learning-journal-quiz-card">
                             <div class="quiz-card-header">
-                                <span class="badge-quiz-type journal">실전 분개 체크</span>
-                                <h4 class="text-sm font-extrabold text-slate-800">실무 분개 연습</h4>
+                                <span class="badge-quiz-type journal">단원 분개 확인</span>
+                                <h4 class="text-sm font-extrabold text-slate-800">단원 통합 실무 분개 연습</h4>
                             </div>
 
                             <div class="quiz-question-text mt-3" id="l-journal-question">
-                                ${escapeHtml(currentStep.journalQuiz.question)}
+                                ${escapeHtml(currentStep.journalQuiz ? currentStep.journalQuiz.question : '')}
                             </div>
 
-                            <!-- 분개 입력 폼 -->
                             <div class="journal-input-section mt-4">
                                 <div id="j-journal-balance-summary" class="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 mb-4 text-xs font-semibold flex justify-between items-center transition">
                                     <span>차변합계: 0원 / 대변합계: 0원 / 차액: 0원</span>
@@ -728,149 +750,42 @@ window.LearningEngine = (function() {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div class="journal-box debit-box">
                                         <div class="flex justify-between items-center mb-1">
-                                            <div class="box-title">【 차 변 (Dr.) 】</div>
+                                            <div class="box-title">차 변 (Dr.) ⬅️</div>
                                             <button class="text-[11px] font-extrabold text-sky-600 hover:underline" onclick="LearningEngine.addDebitRow('', '', true)">+ 줄 추가</button>
                                         </div>
                                         <div id="j-debit-rows-container" class="space-y-2"></div>
                                     </div>
                                     <div class="journal-box credit-box">
                                         <div class="flex justify-between items-center mb-1">
-                                            <div class="box-title">【 대 변 (Cr.) 】</div>
+                                            <div class="box-title">대 변 (Cr.) ➡️</div>
                                             <button class="text-[11px] font-extrabold text-purple-600 hover:underline" onclick="LearningEngine.addCreditRow('', '', true)">+ 줄 추가</button>
                                         </div>
                                         <div id="j-credit-rows-container" class="space-y-2"></div>
                                     </div>
                                 </div>
                             </div>
-
+                            
                             <div id="journal-feedback-box" class="quiz-feedback-container hidden mt-4"></div>
 
                             <div class="flex justify-end mt-4">
                                 <button id="btn-submit-journal-quiz" class="btn-quiz-submit font-bold" onclick="LearningEngine.submitJournalQuiz('${currentStep.id}', '${section.id}')">
-                                    분개 채점하기 ➜
+                                    분개 제출 및 채점 ➜
                                 </button>
                             </div>
                         </div>
                     ` : ''}
+            `;
+        }
 
-                    <!-- 다음 단계 이동 버튼 -->
-                    <div class="step-bottom-nav mt-6 flex justify-between items-center pt-4 border-t border-slate-200">
-                        ${currentStepIdx > 0 ? `
-                            <button class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition" onclick="LearningEngine.openSection('${section.id}', ${currentStepIdx - 1})">
-                                ◀ 이전 단계
-                            </button>
-                        ` : `<div></div>`}
-
-                        ${currentStepIdx < section.steps.length - 1 ? `
-                            <button class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5" onclick="LearningEngine.openSection('${section.id}', ${currentStepIdx + 1})">
-                                다음 단계 ➜
-                            </button>
-                        ` : `
-                            <button class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center gap-1.5" onclick="LearningEngine.showSectionCompleteModal('${section.id}')">
-                                🎉 단원 학습 완료
-                            </button>
-                        `}
-                    </div>
+        uiHtml += `
                 </div>
             </div>
         `;
+        container.innerHTML = uiHtml;
 
-        if (currentStep.journalQuiz) {
-            resetJournalInput();
-        }
-    }
-
-    function selectOption(optNum) {
-        document.querySelectorAll('.quiz-option-item').forEach((item, idx) => {
-            if (idx + 1 === optNum) {
-                item.classList.add('selected');
-                const radio = item.querySelector('input[type="radio"]');
-                if (radio) radio.checked = true;
-            } else {
-                item.classList.remove('selected');
-            }
-        });
-    }
-
-    // --- 4. 복수분개 관련 다중 행 및 자동완성 입력 구현 ---
-    function resetJournalInput() {
-        const dContainer = document.getElementById('j-debit-rows-container');
-        const cContainer = document.getElementById('j-credit-rows-container');
-        if (dContainer) dContainer.innerHTML = '';
-        if (cContainer) cContainer.innerHTML = '';
-
-        addDebitRow('', '', false);
-        addCreditRow('', '', false);
-        updateJournalBalanceSummary();
-    }
-
-    function addDebitRow(acc = '', amt = '', autoFocus = false) {
-        const container = document.getElementById('j-debit-rows-container');
-        if (!container) return;
-        const rowId = 'j-debit-row-' + Date.now() + Math.random();
-        const div = document.createElement('div');
-        div.className = 'flex gap-2 items-center';
-        div.id = rowId;
-        let displayAmt = amt !== '' ? Number(amt).toLocaleString() : '';
-        div.innerHTML = `
-            <div class="relative flex-1 flex items-center min-w-0 bg-white border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-sky-400">
-                <input type="text" lang="ko" style="ime-mode:active; -ms-ime-mode:active;" onchange="if(typeof convertToKoreanIfNeeded==='function') convertToKoreanIfNeeded(this)" onfocus="this.style.imeMode='active'" placeholder="계정과목 (예: 보통예금)" value="${acc}" class="j-debit-acc w-full px-3.5 py-2.5 bg-transparent relative z-10 text-xs text-slate-800 focus:outline-none font-bold">
-                <div class="suggest-popup hidden absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 z-[100] flex flex-col gap-1 max-h-48 overflow-y-auto"></div>
-            </div>
-            <input type="text" inputmode="numeric" oninput="LearningEngine.formatNumberInput(this)" placeholder="금액" value="${displayAmt}" class="j-debit-amt w-28 sm:w-32 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-sky-400 text-right font-bold">
-            <button onclick="LearningEngine.removeRow('${rowId}')" class="text-slate-400 hover:text-rose-500 p-2 font-bold transition">×</button>
-        `;
-        container.appendChild(div);
-        const accInput = div.querySelector('.j-debit-acc');
-        if (typeof attachKoreanInputEvents === 'function') {
-            attachKoreanInputEvents(accInput);
-        }
-        attachLearningAutoCompleteEvents(div, 'debit');
-        if (autoFocus && accInput) {
-            setTimeout(() => { accInput.focus(); accInput.select(); }, 100);
-        }
-        updateJournalBalanceSummary();
-    }
-
-    function addCreditRow(acc = '', amt = '', autoFocus = false) {
-        const container = document.getElementById('j-credit-rows-container');
-        if (!container) return;
-        const rowId = 'j-credit-row-' + Date.now() + Math.random();
-        const div = document.createElement('div');
-        div.className = 'flex gap-2 items-center';
-        div.id = rowId;
-        let displayAmt = amt !== '' ? Number(amt).toLocaleString() : '';
-        div.innerHTML = `
-            <div class="relative flex-1 flex items-center min-w-0 bg-white border border-slate-200 rounded-xl focus-within:ring-2 focus-within:ring-purple-400">
-                <input type="text" lang="ko" style="ime-mode:active; -ms-ime-mode:active;" onchange="if(typeof convertToKoreanIfNeeded==='function') convertToKoreanIfNeeded(this)" onfocus="this.style.imeMode='active'" placeholder="계정과목 (예: 외상매출금)" value="${acc}" class="j-credit-acc w-full px-3.5 py-2.5 bg-transparent relative z-10 text-xs text-slate-800 focus:outline-none font-bold">
-                <div class="suggest-popup hidden absolute left-0 top-full mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 z-[100] flex flex-col gap-1 max-h-48 overflow-y-auto"></div>
-            </div>
-            <input type="text" inputmode="numeric" oninput="LearningEngine.formatNumberInput(this)" placeholder="금액" value="${displayAmt}" class="j-credit-amt w-28 sm:w-32 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-purple-400 text-right font-bold">
-            <button onclick="LearningEngine.removeRow('${rowId}')" class="text-slate-400 hover:text-rose-500 p-2 font-bold transition">×</button>
-        `;
-        container.appendChild(div);
-        const accInput = div.querySelector('.j-credit-acc');
-        if (typeof attachKoreanInputEvents === 'function') {
-            attachKoreanInputEvents(accInput);
-        }
-        attachLearningAutoCompleteEvents(div, 'credit');
-        if (autoFocus && accInput) {
-            setTimeout(() => { accInput.focus(); accInput.select(); }, 100);
-        }
-        updateJournalBalanceSummary();
-    }
-
-    function removeRow(rowId) {
-        const row = document.getElementById(rowId);
-        if (row) {
-            const parent = row.parentNode;
-            if (parent.children.length > 1) {
-                row.remove();
-            } else {
-                const inputs = row.querySelectorAll('input');
-                if (inputs[0]) inputs[0].value = '';
-                if (inputs[1]) inputs[1].value = '';
-            }
+        if (phase === 'quiz' && hasJournal && currentStep.journalQuiz) {
+            window.LearningEngine.addDebitRow('', '', false);
+            window.LearningEngine.addCreditRow('', '', false);
             updateJournalBalanceSummary();
         }
     }
@@ -1292,7 +1207,7 @@ window.LearningEngine = (function() {
 
         // 1. [방안 A] 동적 회계 문제 생성기 우선 호출 (실시간 무한 변형 문제)
         if (window.LearningGenerator && typeof window.LearningGenerator.generateDynamicQuiz === 'function') {
-            const dynQuiz = window.LearningGenerator.generateDynamicQuiz(stepId, sectionId, type);
+            const dynQuiz = window.LearningGenerator.generateDynamicQuiz(null, sectionId, type);
             if (dynQuiz) {
                 currentExtraQuiz = dynQuiz;
                 applyExtraQuizToUI(stepId, sectionId, type);
@@ -1545,17 +1460,15 @@ window.LearningEngine = (function() {
         }
 
         const prog = window.LearningAuth.getProgress() || {};
-        const counts = (prog.correct_counts && prog.correct_counts[stepId]) || { theory: 0, journal: 0 };
+        const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
         let theoryCorrect = counts.theory || 0;
         let journalCorrect = counts.journal || 0;
 
         if (isCorrect) theoryCorrect++;
 
-        const targetTheoryNeed = step.quiz ? 3 : 0;
-        const targetJournalNeed = step.journalQuiz ? 3 : 0;
-        const isStepCompleted = (theoryCorrect >= targetTheoryNeed) && (journalCorrect >= targetJournalNeed);
+        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
 
-        await saveProgress(stepId, sectionId, isCorrect, 'theory', isStepCompleted, {
+        await saveProgress(stepId, sectionId, isCorrect, 'theory', isSectionCompleted, {
             id: step.quiz.id,
             section_title: section.title,
             type: 'theory',
@@ -1566,7 +1479,7 @@ window.LearningEngine = (function() {
             book_reference: step.quiz.bookReference
         });
 
-        if (isStepCompleted && section && currentStepIdx === section.steps.length - 1) {
+        if (isSectionCompleted && section) {
             setTimeout(() => {
                 showSectionCompleteModal(sectionId);
             }, 1200);
@@ -1628,18 +1541,15 @@ window.LearningEngine = (function() {
         const section = curriculum.sections.find(s => s.id === sectionId);
 
         const prog = window.LearningAuth.getProgress() || {};
-        const counts = (prog.correct_counts && prog.correct_counts[stepId]) || { theory: 0, journal: 0 };
+        const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
         let theoryCorrect = counts.theory || 0;
         let journalCorrect = counts.journal || 0;
 
         if (isCorrect) theoryCorrect++;
 
-        const step = section ? section.steps.find(st => st.id === stepId) : null;
-        const targetTheoryNeed = step && step.quiz ? 3 : 0;
-        const targetJournalNeed = step && step.journalQuiz ? 3 : 0;
-        const isStepCompleted = (theoryCorrect >= targetTheoryNeed) && (journalCorrect >= targetJournalNeed);
+        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
 
-        await saveProgress(stepId, sectionId, isCorrect, 'theory', isStepCompleted, {
+        await saveProgress(stepId, sectionId, isCorrect, 'theory', isSectionCompleted, {
             id: currentExtraQuiz.id,
             section_title: section ? section.title : '유사문제',
             type: 'theory',
@@ -1650,7 +1560,7 @@ window.LearningEngine = (function() {
             book_reference: currentExtraQuiz.bookReference
         });
 
-        if (isStepCompleted && section && currentStepIdx === section.steps.length - 1) {
+        if (isSectionCompleted && section) {
             setTimeout(() => {
                 showSectionCompleteModal(sectionId);
             }, 1200);
@@ -1746,17 +1656,15 @@ window.LearningEngine = (function() {
         }
 
         const prog = window.LearningAuth.getProgress() || {};
-        const counts = (prog.correct_counts && prog.correct_counts[stepId]) || { theory: 0, journal: 0 };
+        const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
         let theoryCorrect = counts.theory || 0;
         let journalCorrect = counts.journal || 0;
 
         if (isCorrect) journalCorrect++;
 
-        const targetTheoryNeed = step.quiz ? 3 : 0;
-        const targetJournalNeed = step.journalQuiz ? 3 : 0;
-        const isStepCompleted = (theoryCorrect >= targetTheoryNeed) && (journalCorrect >= targetJournalNeed);
+        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
 
-        await saveProgress(stepId, sectionId, isCorrect, 'journal', isStepCompleted, {
+        await saveProgress(stepId, sectionId, isCorrect, 'journal', isSectionCompleted, {
             id: step.journalQuiz.id,
             section_title: section.title,
             type: 'journal',
@@ -1766,7 +1674,7 @@ window.LearningEngine = (function() {
             book_reference: step.journalQuiz.bookReference
         });
 
-        if (isStepCompleted && section && currentStepIdx === section.steps.length - 1) {
+        if (isSectionCompleted && section) {
             setTimeout(() => {
                 showSectionCompleteModal(sectionId);
             }, 1200);
@@ -1850,18 +1758,15 @@ window.LearningEngine = (function() {
         const section = curriculum.sections.find(s => s.id === sectionId);
 
         const prog = window.LearningAuth.getProgress() || {};
-        const counts = (prog.correct_counts && prog.correct_counts[stepId]) || { theory: 0, journal: 0 };
+        const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
         let theoryCorrect = counts.theory || 0;
         let journalCorrect = counts.journal || 0;
 
         if (isCorrect) journalCorrect++;
 
-        const step = section ? section.steps.find(st => st.id === stepId) : null;
-        const targetTheoryNeed = step && step.quiz ? 3 : 0;
-        const targetJournalNeed = step && step.journalQuiz ? 3 : 0;
-        const isStepCompleted = (theoryCorrect >= targetTheoryNeed) && (journalCorrect >= targetJournalNeed);
+        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
 
-        await saveProgress(stepId, sectionId, isCorrect, 'journal', isStepCompleted, {
+        await saveProgress(stepId, sectionId, isCorrect, 'journal', isSectionCompleted, {
             id: currentExtraQuiz.id,
             section_title: section ? section.title : '유사문제',
             type: 'journal',
@@ -1871,7 +1776,7 @@ window.LearningEngine = (function() {
             book_reference: currentExtraQuiz.bookReference
         });
 
-        if (isStepCompleted && section && currentStepIdx === section.steps.length - 1) {
+        if (isSectionCompleted && section) {
             setTimeout(() => {
                 showSectionCompleteModal(sectionId);
             }, 1200);
@@ -1890,31 +1795,28 @@ window.LearningEngine = (function() {
             }
             
             // --- 정밀 마이크로 진도율 전송값 계산 ---
-            let totalWeight = 0;
+                        let totalWeight = 0;
             let acquiredWeight = 0;
 
-            section.steps.forEach(st => {
-                const counts = (prog.correct_counts && prog.correct_counts[st.id]) || { theory: 0, journal: 0 };
-                let curT = counts.theory || 0;
-                let curJ = counts.journal || 0;
+            const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
+            let curT = counts.theory || 0;
+            let curJ = counts.journal || 0;
 
-                // 이번 저장 요청의 변동분 반영
-                if (st.id === stepId && isCorrect) {
-                    if (quizType === 'theory') curT++;
-                    if (quizType === 'journal') curJ++;
-                }
+            if (isCorrect) {
+                if (quizType === 'theory') curT++;
+                if (quizType === 'journal') curJ++;
+            }
 
-                const reqT = st.quiz ? 3 : 0;
-                const reqJ = st.journalQuiz ? 3 : 0;
-                const maxScore = reqT + reqJ;
+            const reqT = section.steps.some(st => st.quiz) ? 6 : 0;
+            const reqJ = section.steps.some(st => st.journalQuiz) ? 6 : 0;
+            const maxScore = reqT + reqJ;
 
-                if (maxScore > 0) {
-                    const finalT = Math.min(reqT, curT);
-                    const finalJ = Math.min(reqJ, curJ);
-                    acquiredWeight += (finalT + finalJ);
-                    totalWeight += maxScore;
-                }
-            });
+            if (maxScore > 0) {
+                const finalT = Math.min(reqT, curT);
+                const finalJ = Math.min(reqJ, curJ);
+                acquiredWeight += (finalT + finalJ);
+                totalWeight += maxScore;
+            }
 
             let sPct = totalWeight > 0 ? Math.round((acquiredWeight / totalWeight) * 100) : 0;
 
@@ -1922,7 +1824,7 @@ window.LearningEngine = (function() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    step_id: stepId,
+                    step_id: sectionId,
                     section_id: sectionId,
                     quiz_type: quizType,
                     is_correct: isCorrect,
@@ -1936,7 +1838,7 @@ window.LearningEngine = (function() {
                 window.LearningAuth.setProgress(data.progress);
                 if (currentSectionId === sectionId && stepId) {
                     const counts = (data.progress.correct_counts && data.progress.correct_counts[stepId]) || { theory: 0, journal: 0 };
-                    updateGoalBoardUI(stepId, counts);
+                    updateGoalBoardUI(sectionId, counts);
                 }
             }
         } catch (e) {
@@ -1944,25 +1846,40 @@ window.LearningEngine = (function() {
         }
     }
 
-    function updateGoalBoardUI(stepId, counts) {
+    function updateGoalBoardUI(sectionId, counts) {
         const curriculum = window.LearningCurriculum;
-        const section = window.LearningCurriculum.sections.find(s => s.id === currentSectionId);
-        const currentStep = section ? section.steps.find(st => st.id === stepId) : null;
-        if (!currentStep) return;
+        const section = curriculum.sections.find(s => s.id === sectionId);
+        if (!section) return;
 
+        const reqT = section.steps.some(st => st.quiz) ? 6 : 0;
+        const reqJ = section.steps.some(st => st.journalQuiz) ? 6 : 0;
         const tCorrect = counts.theory || 0;
         const jCorrect = counts.journal || 0;
 
-        const board = document.querySelector('.learning-study-view > div.bg-slate-50');
-        if (board) {
-            board.innerHTML = `
-                <div class="flex items-start sm:items-center gap-1.5">
-                    <span class="font-extrabold text-slate-800 flex items-center gap-1 flex-shrink-0">🎯 단계 완수 조건:</span>
-                    <span class="text-slate-500 font-semibold leading-relaxed">각 유형별로 최소 3문제를 맞추면 이 단계가 완수됩니다.</span>
-                </div>
-                <div class="flex gap-2.5 font-bold flex-wrap items-center mt-1 sm:mt-0" id="step-target-board">
-                    ${currentStep.quiz ? `
-                        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${tCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+        const board = document.getElementById('step-target-board');
+        if (!board) return;
+
+        let html = '';
+        if (reqT > 0) {
+            html += `
+                <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${tCorrect >= reqT ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                    <span>📝 필기:</span>
+                    <strong class="text-xs font-mono">${tCorrect}/${reqT}회</strong>
+                    ${tCorrect >= reqT ? '<span class="text-[11px] font-extrabold text-emerald-600">완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${reqT - tCorrect}문제 더 필요)</span>`}
+                </span>
+            `;
+        }
+        if (reqJ > 0) {
+            html += `
+                <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${jCorrect >= reqJ ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                    <span>🧾 분개:</span>
+                    <strong class="text-xs font-mono">${jCorrect}/${reqJ}회</strong>
+                    ${jCorrect >= reqJ ? '<span class="text-[11px] font-extrabold text-emerald-600">완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${reqJ - jCorrect}문제 더 필요)</span>`}
+                </span>
+            `;
+        }
+        board.innerHTML = html;
+    }">
                             <span>📝 필기:</span>
                             <strong class="text-xs font-mono">${tCorrect}/3회</strong>
                             ${tCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - tCorrect}문제 더 필요)</span>`}

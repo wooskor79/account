@@ -149,7 +149,7 @@ window.LearningWrongNotes = (function() {
                         </button>
                     `}
                     <button class="btn-note-delete" onclick="LearningWrongNotes.deleteNote('${note.id}')" title="오답노트에서 삭제">
-                        <i class="fa-solid fa-trash-can"></i>
+                        삭제
                     </button>
                 </div>
             </div>
@@ -202,23 +202,24 @@ window.LearningWrongNotes = (function() {
     }
 
     async function deleteNote(noteId) {
-        if (!confirm('이 문제를 오답노트에서 삭제하시겠습니까?')) return;
-        try {
-            const res = await fetch('?action=learning_resolve_wrong_note', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ note_id: noteId, delete: true })
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                const prog = window.LearningAuth.getProgress() || {};
-                prog.wrong_notes = data.wrong_notes;
-                window.LearningAuth.setProgress(prog);
-                renderWrongNotesView(document.getElementById('learning-content-container'));
+        window.customConfirm('이 문제를 오답노트에서 삭제하시겠습니까?', async () => {
+            try {
+                const res = await fetch('?action=learning_resolve_wrong_note', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ note_id: noteId, delete: true })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const prog = window.LearningAuth.getProgress() || {};
+                    prog.wrong_notes = data.wrong_notes;
+                    window.LearningAuth.setProgress(prog);
+                    renderWrongNotesView(document.getElementById('learning-content-container'));
+                }
+            } catch (e) {
+                console.error('오답노트 삭제 실패:', e);
             }
-        } catch (e) {
-            console.error('오답노트 삭제 실패:', e);
-        }
+        });
     }
 
     return {

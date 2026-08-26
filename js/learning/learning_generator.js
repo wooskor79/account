@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 2026 PERFECT 전산회계 1급 동적 문제 생성 엔진 (Dynamic Problem Generator)
  * - 각 단원/스텝별로 숫자, 거래처, 계정 조건, 상황을 실시간으로 변형하여 무한히 새로운 필기/분개 문제를 생성합니다.
  */
@@ -416,6 +416,14 @@ window.LearningGenerator = (function() {
      * 특정 스텝 및 유형(theory / journal)에 대한 신규 동적 문제 생성
      */
     function generateDynamicQuiz(stepId, sectionId, type) {
+        if (!stepId && sectionId && window.LearningCurriculum) {
+            const section = window.LearningCurriculum.sections.find(s => s.id === sectionId);
+            if (section && section.steps && section.steps.length > 0) {
+                const randomStep = section.steps[Math.floor(Math.random() * section.steps.length)];
+                stepId = randomStep.id;
+            }
+        }
+
         let gen = stepGenerators[stepId];
         
         if (!gen && sectionId) {

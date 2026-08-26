@@ -112,6 +112,73 @@ $show_lock_gate = $is_private && !$is_admin;
                 modal.classList.add('opacity-0', 'pointer-events-none');
             }
         }
+        
+        // window.customConfirm -> 비동기 모달로 confirm 대체
+        window.customConfirm = function(message, onConfirm, onCancel) {
+            let modal = document.getElementById('custom-confirm-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'custom-confirm-modal';
+                modal.className = 'fixed inset-0 z-[999999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4 opacity-0 pointer-events-none transition-all duration-200 ease-out';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-sm w-full text-center border border-slate-100 transform scale-95 transition-all duration-200 ease-out" id="custom-confirm-card">
+                        <div class="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 shadow-inner" id="custom-confirm-icon">
+                            ❓
+                        </div>
+                        <h3 class="text-base font-extrabold text-slate-800" id="custom-confirm-title">확인</h3>
+                        <p class="text-xs sm:text-sm text-slate-500 mt-3 leading-relaxed whitespace-pre-line text-center font-medium" id="custom-confirm-message"></p>
+                        <div class="flex gap-3 mt-6">
+                            <button id="custom-confirm-cancel-btn" class="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl transition">
+                                취소
+                            </button>
+                            <button id="custom-confirm-ok-btn" class="flex-1 py-3.5 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md hover:shadow-lg transition">
+                                확인
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            const msgEl = modal.querySelector('#custom-confirm-message');
+            if (msgEl) msgEl.textContent = message;
+
+            const okBtn = modal.querySelector('#custom-confirm-ok-btn');
+            const cancelBtn = modal.querySelector('#custom-confirm-cancel-btn');
+            
+            const cleanup = () => {
+                const card = document.getElementById('custom-confirm-card');
+                if (card) {
+                    card.classList.remove('scale-100');
+                    card.classList.add('scale-95');
+                }
+                modal.classList.add('opacity-0', 'pointer-events-none');
+                
+                // 이벤트 리스너 제거
+                okBtn.replaceWith(okBtn.cloneNode(true));
+                cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+            };
+
+            okBtn.addEventListener('click', () => {
+                cleanup();
+                if (onConfirm) onConfirm();
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                if (onCancel) onCancel();
+            });
+
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            const card = modal.querySelector('#custom-confirm-card');
+            setTimeout(() => {
+                if (card) {
+                    card.classList.remove('scale-95');
+                    card.classList.add('scale-100');
+                }
+                cancelBtn.focus();
+            }, 20);
+        };
     })();
     </script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
