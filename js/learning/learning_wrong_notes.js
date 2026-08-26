@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 1급 맞춤 코스 학습용 오답노트 관리 및 복습 모듈
  */
 window.LearningWrongNotes = (function() {
@@ -43,8 +43,10 @@ window.LearningWrongNotes = (function() {
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_asset', this)">💎 자산</button>
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_liability', this)">📜 부채</button>
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_equity', this)">🏛️ 자본</button>
+                <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_revenue_expense', this)">📈 수익·비용</button>
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_cost', this)">⚙️ 원가회계</button>
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_vat', this)">🧾 부가가치세</button>
+                <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_closing', this)">🎯 결산마스터</button>
             </div>
 
             <!-- 오답 카드 목록 -->
