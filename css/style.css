@@ -69,6 +69,8 @@ box-shadow: 0 6px 20px -2px rgba(15, 23, 42, 0.07);
 border: 1px solid rgba(255, 255, 255, 0.9);
 margin-bottom: 12px;
 flex-shrink: 0;
+position: relative;
+z-index: 1000;
 }
 
 .logo-section {
@@ -1281,6 +1283,15 @@ body { height: auto; overflow-y: auto; }
 .calc-display { font-size: 1.4rem; padding: 10px; }
 .calc-btn { padding: 10px 0; font-size: 1rem; }
 }
+#quiz-dropdown-wrapper {
+    position: relative;
+    z-index: 1001;
+}
+
+#quiz-menu-dropdown, #quiz1-menu-dropdown {
+    z-index: 99999 !important;
+}
+
 /* 모바일 및 태블릿 환경 강제 문제풀이 모드 및 상단 레이아웃 */
 @media (max-width: 1024px) {
     #main-content-view {
@@ -1291,21 +1302,23 @@ body { height: auto; overflow-y: auto; }
     }
     
     header {
-        padding: 15px 20px;
+        padding: 10px 16px;
+        position: relative;
+        z-index: 1000;
     }
     .logo-section {
         flex-direction: row;
         flex-wrap: wrap;
-        gap: 10px;
+        gap: 8px;
         align-items: center;
     }
     .logo-section h1 {
-        margin-right: 15px;
+        margin-right: 10px;
         white-space: nowrap;
-        font-size: 1.3rem;
+        font-size: 1.2rem;
     }
     .header-links {
-        gap: 15px;
+        gap: 10px;
     }
     .login-section {
         display: none !important; /* 모바일/태블릿에서 로그인 숨김 */

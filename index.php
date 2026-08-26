@@ -84,13 +84,13 @@ $show_lock_gate = $is_private && !$is_admin;
             </button>
 
             <div class="header-links" style="align-items: center; display: flex; margin-left: auto;">
-                <div class="relative inline-block" id="quiz-dropdown-wrapper">
+                <div class="relative inline-block z-[1001]" id="quiz-dropdown-wrapper">
                     <!-- 급수에 따라 텍스트 및 색상이 동적 변경되는 단일 문제풀이 버튼 -->
                     <span id="quiz-menu-btn" onclick="toggleQuizMenu()" style="color: var(--accounting-point); font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; font-size:1.05rem;">
                         ✨ 2급문제풀이 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </span>
 
-                    <div id="quiz-menu-dropdown" class="hidden absolute right-0 left-auto mt-3 w-64 max-w-[calc(100vw-32px)] bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-[9999]">
+                    <div id="quiz-menu-dropdown" class="hidden absolute right-0 left-auto mt-3 w-64 max-w-[calc(100vw-32px)] bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-[99999]">
                         <!-- 2급 문제풀이 메뉴 (기초 모드 시 노출) -->
                         <div id="quiz-menu-items-grade2">
                             <a onclick="openQuizApp('journal')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
@@ -276,17 +276,17 @@ $show_lock_gate = $is_private && !$is_admin;
     <div id="quiz-content-view" class="hidden flex-grow flex items-center justify-center p-4 bg-[#fdfbf7] overflow-y-auto" style="min-height: calc(100vh - 85px);">
         
         <!-- 1. 분개문제풀기 컨테이너 -->
-        <div id="journal-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-6 sm:p-8 border border-amber-100 my-auto hidden relative">
+        <div id="journal-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-4 sm:p-7 md:p-8 border border-amber-100 my-auto hidden relative">
             
-            <header class="flex items-center justify-between gap-1 sm:gap-2 mb-4 md:mb-6 min-h-[52px]">
+            <header class="flex items-center justify-between gap-1 sm:gap-2 mb-2 sm:mb-4 min-h-[38px] sm:min-h-[48px]">
                 <div class="flex items-center flex-shrink-0 min-w-0 lg:min-w-[110px]">
                     <button onclick="goHome()" class="hidden lg:inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl transition font-medium whitespace-nowrap shadow-xs">
                         🏠 홈으로 돌아가기
                     </button>
                 </div>
                 
-                <div class="flex-1 flex items-center justify-center min-h-[48px] px-1 overflow-hidden">
-                    <h1 class="text-base sm:text-xl md:text-2xl font-bold text-slate-800 text-center leading-snug break-keep line-clamp-2 max-w-full m-0">2급분개</h1>
+                <div class="flex-1 flex items-center justify-center min-h-[36px] sm:min-h-[44px] px-1 overflow-hidden">
+                    <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 text-center leading-snug break-keep line-clamp-2 max-w-full m-0">2급분개</h1>
                 </div>
 
                 <div class="flex items-center justify-end flex-shrink-0 min-w-0 md:min-w-[110px]">
@@ -298,21 +298,21 @@ $show_lock_gate = $is_private && !$is_admin;
             </header>
 
             <!-- 분개 Start Screen -->
-            <div id="start-screen" class="text-center py-6 space-y-4">
-                <div class="bg-amber-50/80 rounded-2xl p-6 border border-amber-200 text-slate-800 shadow-sm max-w-md mx-auto">
-                    <label for="quiz-user-name" class="block text-sm font-bold text-amber-900 mb-2">
+            <div id="start-screen" class="text-center py-2 sm:py-4 space-y-3">
+                <div class="bg-amber-50/80 rounded-2xl p-4 sm:p-5 border border-amber-200 text-slate-800 shadow-sm max-w-md mx-auto">
+                    <label for="quiz-user-name" class="block text-xs sm:text-sm font-bold text-amber-900 mb-1.5">
                         👤 사용자 이름을 적어주세요
                     </label>
-                    <input type="text" id="quiz-user-name" placeholder="이름을 입력하세요 (예: 홍길동)" class="w-full bg-white border border-amber-300 rounded-xl px-4 py-3 text-slate-800 outline-none text-center font-bold text-base focus:ring-2 focus:ring-amber-400 focus:border-amber-500 shadow-inner transition" onchange="saveUserName(this.value)" oninput="syncUserName(this.value); updateWrongNotesUI('journal', currentQuizLevel);" onkeydown="if(event.key==='Enter'){ saveUserName(this.value); startQuiz(); }">
+                    <input type="text" id="quiz-user-name" placeholder="이름을 입력하세요 (예: 홍길동)" class="w-full bg-white border border-amber-300 rounded-xl px-3.5 py-2.5 sm:py-3 text-slate-800 outline-none text-center font-bold text-sm sm:text-base focus:ring-2 focus:ring-amber-400 focus:border-amber-500 shadow-inner transition" onchange="saveUserName(this.value)" oninput="syncUserName(this.value); updateWrongNotesUI('journal', currentQuizLevel);" onkeydown="if(event.key==='Enter'){ saveUserName(this.value); startQuiz(); }">
                 </div>
 
                 <span id="status-message" class="hidden"></span>
 
-                <div class="max-w-md mx-auto flex flex-col gap-2.5">
-                    <button id="start-btn" onclick="startQuiz()" disabled class="w-full py-4 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold rounded-2xl shadow-md transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-base flex items-center justify-center gap-2">
+                <div class="max-w-md mx-auto flex flex-col gap-2">
+                    <button id="start-btn" onclick="startQuiz()" disabled class="w-full py-3 sm:py-3.5 bg-amber-400 hover:bg-amber-500 text-slate-900 font-bold rounded-2xl shadow-md transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center gap-2">
                         ✨ 분개문제 풀기 시작하기
                     </button>
-                    <button id="start-wrong-journal-btn" onclick="startWrongJournalQuiz()" disabled class="w-full py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-300 font-bold rounded-2xl shadow-sm transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                    <button id="start-wrong-journal-btn" onclick="startWrongJournalQuiz()" disabled class="w-full py-2.5 sm:py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-300 font-bold rounded-2xl shadow-sm transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm flex items-center justify-center gap-2">
                         <span>📌 내 오답노트 다시 풀기</span>
                         <span id="wrong-journal-count-badge" class="bg-rose-500 text-white text-xs px-2.5 py-0.5 rounded-full font-extrabold shadow-2xs">0개</span>
                     </button>
@@ -394,17 +394,17 @@ $show_lock_gate = $is_private && !$is_admin;
         </div>
 
         <!-- 2. 필기문제풀기 컨테이너 -->
-        <div id="theory-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-6 sm:p-8 border border-emerald-100 my-auto hidden relative">
+        <div id="theory-quiz-container" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-4 sm:p-7 md:p-8 border border-emerald-100 my-auto hidden relative">
             
-            <header class="flex items-center justify-between gap-1 sm:gap-2 mb-4 md:mb-6 min-h-[52px]">
+            <header class="flex items-center justify-between gap-1 sm:gap-2 mb-2 sm:mb-4 min-h-[38px] sm:min-h-[48px]">
                 <div class="flex items-center flex-shrink-0 min-w-0 lg:min-w-[110px]">
                     <button onclick="goHome()" class="hidden lg:inline-flex items-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-xl transition font-medium whitespace-nowrap shadow-xs">
                         🏠 홈으로 돌아가기
                     </button>
                 </div>
                 
-                <div class="flex-1 flex items-center justify-center min-h-[48px] px-1 overflow-hidden">
-                    <h1 class="text-base sm:text-xl md:text-2xl font-bold text-slate-800 text-center leading-snug break-keep line-clamp-2 max-w-full m-0">2급필기</h1>
+                <div class="flex-1 flex items-center justify-center min-h-[36px] sm:min-h-[44px] px-1 overflow-hidden">
+                    <h1 class="text-base sm:text-lg md:text-xl font-bold text-slate-800 text-center leading-snug break-keep line-clamp-2 max-w-full m-0">2급필기</h1>
                 </div>
 
                 <div class="flex items-center justify-end flex-shrink-0 min-w-0 md:min-w-[110px]">
@@ -416,21 +416,21 @@ $show_lock_gate = $is_private && !$is_admin;
             </header>
 
             <!-- 필기 Start Screen -->
-            <div id="theory-start-screen" class="text-center py-6 space-y-4">
-                <div class="bg-emerald-50/80 rounded-2xl p-6 border border-emerald-200 text-slate-800 shadow-sm max-w-md mx-auto">
-                    <label for="theory-quiz-user-name" class="block text-sm font-bold text-emerald-900 mb-2">
+            <div id="theory-start-screen" class="text-center py-2 sm:py-4 space-y-3">
+                <div class="bg-emerald-50/80 rounded-2xl p-4 sm:p-5 border border-emerald-200 text-slate-800 shadow-sm max-w-md mx-auto">
+                    <label for="theory-quiz-user-name" class="block text-xs sm:text-sm font-bold text-emerald-900 mb-1.5">
                         👤 사용자 이름을 적어주세요
                     </label>
-                    <input type="text" id="theory-quiz-user-name" placeholder="이름을 입력하세요 (예: 홍길동)" class="w-full bg-white border border-emerald-300 rounded-xl px-4 py-3 text-slate-800 outline-none text-center font-bold text-base focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 shadow-inner transition" onchange="saveUserName(this.value)" oninput="syncUserName(this.value); updateWrongNotesUI('theory', currentQuizLevel);" onkeydown="if(event.key==='Enter'){ saveUserName(this.value); startTheoryQuiz(); }">
+                    <input type="text" id="theory-quiz-user-name" placeholder="이름을 입력하세요 (예: 홍길동)" class="w-full bg-white border border-emerald-300 rounded-xl px-3.5 py-2.5 sm:py-3 text-slate-800 outline-none text-center font-bold text-sm sm:text-base focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500 shadow-inner transition" onchange="saveUserName(this.value)" oninput="syncUserName(this.value); updateWrongNotesUI('theory', currentQuizLevel);" onkeydown="if(event.key==='Enter'){ saveUserName(this.value); startTheoryQuiz(); }">
                 </div>
 
                 <span id="theory-status-message" class="hidden"></span>
 
-                <div class="max-w-md mx-auto flex flex-col gap-2.5">
-                    <button id="start-theory-btn" onclick="startTheoryQuiz()" class="w-full py-4 bg-emerald-400 hover:bg-emerald-500 text-slate-900 font-bold rounded-2xl shadow-md transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-base flex items-center justify-center gap-2">
+                <div class="max-w-md mx-auto flex flex-col gap-2">
+                    <button id="start-theory-btn" onclick="startTheoryQuiz()" class="w-full py-3 sm:py-3.5 bg-emerald-400 hover:bg-emerald-500 text-slate-900 font-bold rounded-2xl shadow-md transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center gap-2">
                         ✨ 필기문제 풀기 시작하기
                     </button>
-                    <button id="start-wrong-theory-btn" onclick="startWrongTheoryQuiz()" disabled class="w-full py-3.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-300 font-bold rounded-2xl shadow-sm transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                    <button id="start-wrong-theory-btn" onclick="startWrongTheoryQuiz()" disabled class="w-full py-2.5 sm:py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border-2 border-rose-300 font-bold rounded-2xl shadow-sm transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm flex items-center justify-center gap-2">
                         <span>📌 내 오답노트 다시 풀기</span>
                         <span id="wrong-theory-count-badge" class="bg-rose-500 text-white text-xs px-2.5 py-0.5 rounded-full font-extrabold shadow-2xs">0개</span>
                     </button>
