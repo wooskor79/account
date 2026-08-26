@@ -1124,6 +1124,300 @@ if ($action) {
         exit;
     }
 
+    // =========================================================================
+    // --- 1급 맞춤 코스 학습 (Learning Course) API ---
+    // =========================================================================
+    $learning_users_file = __DIR__ . '/data/learning_users.json';
+    $learning_progress_file = __DIR__ . '/data/learning_progress.json';
+
+    // 1) 학습자 회원가입
+    if ($action === 'learning_register') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $username = isset($input['username']) ? trim($input['username']) : '';
+        $password = isset($input['password']) ? (string)$input['password'] : '';
+        $password_confirm = isset($input['password_confirm']) ? (string)$input['password_confirm'] : '';
+
+        if (mb_strlen($username, 'UTF-8') < 1 || mb_strlen($username, 'UTF-8') > 30) {
+            http_response_code(400);
+            exit(json_encode(['success' => false, 'message' => '이름(아이디)을 1~30자 이내로 입력해주세요.']));
+        }
+        if (strlen($password) < 4) {
+            http_response_code(400);
+            exit(json_encode(['success' => false, 'message' => '비밀번호는 숫자 4자리 이상으로 입력해주세요.']));
+        }
+        if ($password !== $password_confirm) {
+            http_response_code(400);
+            exit(json_encode(['success' => false, 'message' => '비밀번호와 비밀번호 확인이 일치하지 않습니다.']));
+        }
+
+        $users = atomic_json_read($learning_users_file);
+        if (!is_array($users)) $users = [];
+
+        foreach ($users as $u) {
+            if (isset($u['username']) && mb_strtolower($u['username'], 'UTF-8') === mb_strtolower($username, 'UTF-8')) {
+                http_response_code(409);
+                exit(json_encode(['success' => false, 'message' => '이미 등록된 학습자 이름입니다. 다른 이름을 사용해주세요.']));
+            }
+        }
+
+        $user_id = 'user_' . bin2hex(random_bytes(8));
+        $new_user = [
+            'id' => $user_id,
+            'username' => $username,
+            'password_hash' => password_hash($password, PASSWORD_BCRYPT),
+            'created_at' => date('Y-m-d H:i:s'),
+            'last_login' => date('Y-m-d H:i:s')
+        ];
+
+        atomic_json_modify($learning_users_file, function($data) use ($new_user) {
+            if (!is_array($data)) $data = [];
+            $data[] = $new_user;
+            return $data;
+        });
+
+        // 세션 로그인
+        $_SESSION['learning_user'] = [
+            'id' => $user_id,
+            'username' => $username
+        ];
+
+        // 기본 진도율 초기화
+        atomic_json_modify($learning_progress_file, function($data) use ($user_id) {
+            if (!is_array($data)) $data = [];
+            if (!isset($data[$user_id])) {
+                $data[$user_id] = [
+                    'completed_steps' => [],
+                    'section_progress' => [],
+                    'wrong_notes' => [],
+                    'stats' => ['solved_count' => 0, 'correct_count' => 0]
+                ];
+            }
+            return $data;
+        });
+
+        echo json_encode([
+            'success' => true,
+            'message' => '회원가입이 완료되었습니다!',
+            'user' => ['id' => $user_id, 'username' => $username]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // 2) 학습자 로그인
+    if ($action === 'learning_login') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $username = isset($input['username']) ? trim($input['username']) : '';
+        $password = isset($input['password']) ? (string)$input['password'] : '';
+
+        if (!$username || !$password) {
+            http_response_code(400);
+            exit(json_encode(['success' => false, 'message' => '이름과 비밀번호를 입력해주세요.']));
+        }
+
+        $users = atomic_json_read($learning_users_file);
+        if (!is_array($users)) $users = [];
+
+        $matched = null;
+        foreach ($users as $u) {
+            if (isset($u['username']) && mb_strtolower($u['username'], 'UTF-8') === mb_strtolower($username, 'UTF-8')) {
+                if (password_verify($password, $u['password_hash'])) {
+                    $matched = $u;
+                    break;
+                }
+            }
+        }
+
+        if (!$matched) {
+            http_response_code(401);
+            exit(json_encode(['success' => false, 'message' => '이름 또는 비밀번호가 올바르지 않습니다.']));
+        }
+
+        $_SESSION['learning_user'] = [
+            'id' => $matched['id'],
+            'username' => $matched['username']
+        ];
+
+        // 마지막 로그인 갱신
+        atomic_json_modify($learning_users_file, function($data) use ($matched) {
+            if (!is_array($data)) return [];
+            foreach ($data as &$u) {
+                if ($u['id'] === $matched['id']) {
+                    $u['last_login'] = date('Y-m-d H:i:s');
+                    break;
+                }
+            }
+            return $data;
+        });
+
+        echo json_encode([
+            'success' => true,
+            'message' => '로그인 성공!',
+            'user' => ['id' => $matched['id'], 'username' => $matched['username']]
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // 3) 학습자 로그아웃
+    if ($action === 'learning_logout') {
+        unset($_SESSION['learning_user']);
+        echo json_encode(['success' => true, 'message' => '로그아웃되었습니다.']);
+        exit;
+    }
+
+    // 4) 학습자 상태 및 진도율 조회
+    if ($action === 'learning_status') {
+        $cur_user = isset($_SESSION['learning_user']) ? $_SESSION['learning_user'] : null;
+        if (!$cur_user) {
+            echo json_encode(['is_logged_in' => false], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $progress_data = atomic_json_read($learning_progress_file);
+        $user_prog = isset($progress_data[$cur_user['id']]) ? $progress_data[$cur_user['id']] : [
+            'completed_steps' => [],
+            'section_progress' => [],
+            'wrong_notes' => [],
+            'stats' => ['solved_count' => 0, 'correct_count' => 0]
+        ];
+
+        echo json_encode([
+            'is_logged_in' => true,
+            'user' => $cur_user,
+            'progress' => $user_prog
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // 5) 학습 스텝 완료 및 진도 저장
+    if ($action === 'learning_save_step') {
+        $cur_user = isset($_SESSION['learning_user']) ? $_SESSION['learning_user'] : null;
+        if (!$cur_user) {
+            http_response_code(401);
+            exit(json_encode(['success' => false, 'message' => '로그인이 필요합니다.']));
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input) { http_response_code(400); exit; }
+
+        $step_id = isset($input['step_id']) ? trim($input['step_id']) : '';
+        $section_id = isset($input['section_id']) ? trim($input['section_id']) : '';
+        $is_correct = isset($input['is_correct']) ? (bool)$input['is_correct'] : null;
+        $wrong_data = isset($input['wrong_data']) ? $input['wrong_data'] : null;
+        $section_pct = isset($input['section_pct']) ? min(100, max(0, (int)$input['section_pct'])) : null;
+
+        $user_id = $cur_user['id'];
+
+        $updated_prog = atomic_json_modify($learning_progress_file, function($data) use ($user_id, $step_id, $section_id, $is_correct, $wrong_data, $section_pct) {
+            if (!is_array($data)) $data = [];
+            if (!isset($data[$user_id])) {
+                $data[$user_id] = [
+                    'completed_steps' => [],
+                    'section_progress' => [],
+                    'wrong_notes' => [],
+                    'stats' => ['solved_count' => 0, 'correct_count' => 0]
+                ];
+            }
+
+            // 스텝 완료 추가
+            if ($step_id && !in_array($step_id, $data[$user_id]['completed_steps'])) {
+                $data[$user_id]['completed_steps'][] = $step_id;
+            }
+
+            // 섹션 진도율 갱신
+            if ($section_id && $section_pct !== null) {
+                $data[$user_id]['section_progress'][$section_id] = $section_pct;
+            }
+
+            // 통계 및 오답노트
+            if ($is_correct !== null) {
+                $data[$user_id]['stats']['solved_count']++;
+                if ($is_correct) {
+                    $data[$user_id]['stats']['correct_count']++;
+                } else if ($wrong_data && is_array($wrong_data)) {
+                    // 오답노트에 추가 또는 업데이트
+                    $prob_key = isset($wrong_data['id']) ? (string)$wrong_data['id'] : $step_id;
+                    $found = false;
+                    foreach ($data[$user_id]['wrong_notes'] as &$wn) {
+                        if ($wn['id'] === $prob_key) {
+                            $wn['wrong_count'] = ($wn['wrong_count'] ?? 1) + 1;
+                            $wn['last_wrong_at'] = date('Y-m-d H:i:s');
+                            $wn['resolved'] = false;
+                            $found = true;
+                            break;
+                        }
+                    }
+                    if (!$found) {
+                        $data[$user_id]['wrong_notes'][] = [
+                            'id' => $prob_key,
+                            'step_id' => $step_id,
+                            'section_id' => $section_id,
+                            'section_title' => $wrong_data['section_title'] ?? '',
+                            'type' => $wrong_data['type'] ?? 'theory',
+                            'question' => $wrong_data['question'] ?? '',
+                            'options' => $wrong_data['options'] ?? [],
+                            'correct_answer' => $wrong_data['correct_answer'] ?? '',
+                            'explanation' => $wrong_data['explanation'] ?? '',
+                            'book_reference' => $wrong_data['book_reference'] ?? '',
+                            'wrong_count' => 1,
+                            'created_at' => date('Y-m-d H:i:s'),
+                            'last_wrong_at' => date('Y-m-d H:i:s'),
+                            'resolved' => false
+                        ];
+                    }
+                }
+            }
+
+            return $data;
+        });
+
+        echo json_encode([
+            'success' => true,
+            'progress' => $updated_prog[$user_id] ?? []
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // 6) 오답노트 복습 완료(해결) 또는 삭제
+    if ($action === 'learning_resolve_wrong_note') {
+        $cur_user = isset($_SESSION['learning_user']) ? $_SESSION['learning_user'] : null;
+        if (!$cur_user) {
+            http_response_code(401);
+            exit(json_encode(['success' => false, 'message' => '로그인이 필요합니다.']));
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $note_id = isset($input['note_id']) ? (string)$input['note_id'] : '';
+        $delete = isset($input['delete']) && $input['delete'] === true;
+
+        $user_id = $cur_user['id'];
+
+        $updated_prog = atomic_json_modify($learning_progress_file, function($data) use ($user_id, $note_id, $delete) {
+            if (!is_array($data) || !isset($data[$user_id])) return $data;
+
+            if ($delete) {
+                $data[$user_id]['wrong_notes'] = array_values(array_filter(
+                    $data[$user_id]['wrong_notes'],
+                    function($wn) use ($note_id) { return $wn['id'] !== $note_id; }
+                ));
+            } else {
+                foreach ($data[$user_id]['wrong_notes'] as &$wn) {
+                    if ($wn['id'] === $note_id) {
+                        $wn['resolved'] = true;
+                        $wn['resolved_at'] = date('Y-m-d H:i:s');
+                        break;
+                    }
+                }
+            }
+            return $data;
+        });
+
+        echo json_encode([
+            'success' => true,
+            'wrong_notes' => $updated_prog[$user_id]['wrong_notes'] ?? []
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
 }
 
 

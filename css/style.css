@@ -1305,8 +1305,13 @@ body { height: auto; overflow-y: auto; }
     #main-content-view {
         display: none !important;
     }
-    #quiz-content-view {
+    #quiz-content-view:not(.hidden) {
         display: flex !important;
+        position: relative;
+        z-index: 1;
+    }
+    #learning-course-view:not(.hidden) {
+        display: block !important;
         position: relative;
         z-index: 1;
     }
@@ -1331,12 +1336,667 @@ body { height: auto; overflow-y: auto; }
         gap: 10px;
     }
     .login-section {
-        display: none !important; /* 모바일/태블릿에서 로그인 숨김 */
+        display: none !important;
     }
-}
-
-@media (max-width: 1024px) {
     .mobile-hidden {
         display: none !important;
     }
+}
+
+/* =========================================================================
+   1급 맞춤 코스 학습 (Learning Course) 모던 스타일 시스템
+   ========================================================================= */
+
+/* 1. 간편 회원가입 / 로그인 뷰 */
+.learning-auth-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 70vh;
+    padding: 20px 10px;
+}
+.learning-auth-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 24px;
+    box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.8);
+    width: 100%;
+    max-width: 440px;
+    padding: 32px 28px;
+    transition: transform 0.2s ease;
+}
+.learning-auth-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+.auth-icon-badge {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: #ffffff;
+    font-size: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    box-shadow: 0 8px 16px -4px rgba(59, 130, 246, 0.4);
+}
+.auth-tabs {
+    display: flex;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    gap: 4px;
+}
+.auth-tab-btn {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #64748b;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.auth-tab-btn.active {
+    background: #ffffff;
+    color: #0f172a;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+.auth-form-body .form-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 6px;
+}
+.auth-form-body .form-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #0f172a;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+.auth-form-body .form-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+.btn-auth-submit {
+    width: 100%;
+    padding: 12px 0;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: #ffffff;
+    border: none;
+    border-radius: 14px;
+    font-size: 0.9rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 6px 16px -2px rgba(37, 99, 235, 0.35);
+    transition: all 0.15s ease;
+}
+.btn-auth-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px -2px rgba(37, 99, 235, 0.45);
+}
+.auth-error-msg {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    color: #dc2626;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+/* 2. 학습자 대시보드 */
+.learning-dashboard-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+.learning-profile-banner {
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border-radius: 20px;
+    padding: 20px 24px;
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.05);
+}
+.profile-avatar-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    color: #ffffff;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+}
+.btn-learning-wrong-notes {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: #fff1f2;
+    border: 1px solid #ffe4e6;
+    color: #e11d48;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-learning-wrong-notes:hover {
+    background: #ffe4e6;
+    transform: translateY(-1px);
+}
+.badge-wrong-pill {
+    padding: 1px 7px;
+    background: #e11d48;
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    border-radius: 9999px;
+}
+.btn-learning-logout {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-learning-logout:hover {
+    background: #fee2e2;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+/* 단원 카드 */
+.curriculum-section-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 18px 18px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.04);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+.curriculum-section-card:hover {
+    transform: translateY(-3px);
+    border-color: #93c5fd;
+    box-shadow: 0 12px 24px -4px rgba(59, 130, 246, 0.12);
+}
+.section-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.section-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.2px;
+}
+.section-book-page {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #0369a1;
+    background: #f0f9ff;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    border: 1px solid #e0f2fe;
+}
+.btn-section-enter {
+    width: 100%;
+    padding: 7px 0;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.curriculum-section-card:hover .btn-section-enter {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+
+/* 3. 단원 상세 학습 뷰 */
+.learning-study-view {
+    max-width: 900px;
+    margin: 0 auto;
+}
+.study-nav-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 10px 16px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+}
+.btn-learning-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-learning-back:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+.step-nav-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+.step-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+.step-tab-btn.active {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    color: #1d4ed8;
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+}
+.step-tab-btn.done .step-num {
+    background: #10b981;
+    color: #ffffff;
+}
+.step-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background: #cbd5e1;
+    color: #475569;
+    font-size: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 이론 카드 */
+.theory-study-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 22px 24px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04);
+}
+.theory-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.book-ref-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #92400e;
+    background: #fef3c7;
+    border: 1px solid #fde68a;
+    padding: 3px 10px;
+    border-radius: 8px;
+}
+.theory-points-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.theory-point-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+.theory-tip-box {
+    background: #fffbeb;
+    border: 1px dashed #f59e0b;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #92400e;
+}
+
+/* 실전 체크 퀴즈 카드 */
+.practice-quiz-card {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 22px 24px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04);
+}
+.badge-quiz-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+}
+.badge-quiz-type.theory { background: #dbeafe; color: #1e40af; }
+.badge-quiz-type.journal { background: #fef3c7; color: #b45309; }
+
+.quiz-question-text {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.5;
+    background: #f8fafc;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+}
+.quiz-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.quiz-option-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.quiz-option-item:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+.quiz-option-item.selected {
+    background: #eff6ff;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+.quiz-option-item input[type="radio"] {
+    display: none;
+}
+.quiz-option-item .opt-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.quiz-option-item.selected .opt-num {
+    background: #3b82f6;
+    color: #ffffff;
+}
+.quiz-option-item .opt-text {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    flex: 1;
+}
+
+/* 실무 분개 입력 박스 */
+.journal-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+.journal-box.debit-box { border-left: 4px solid #3b82f6; }
+.journal-box.credit-box { border-left: 4px solid #f59e0b; }
+.journal-box .box-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #475569;
+}
+
+.btn-quiz-submit {
+    padding: 9px 20px;
+    background: #0f172a;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+    transition: all 0.15s ease;
+}
+.btn-quiz-submit:hover {
+    background: #1e293b;
+    transform: translateY(-1px);
+}
+.btn-quiz-submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.quiz-feedback-container {
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+}
+.quiz-feedback-container.correct {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+}
+.quiz-feedback-container.wrong {
+    background: #fff1f2;
+    border-color: #fecdd3;
+}
+
+/* 4. 오답노트 카드 및 필터 탭 */
+.learning-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    padding: 16px 20px;
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+}
+.learning-filter-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+.filter-tab-btn {
+    padding: 6px 12px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+.filter-tab-btn.active {
+    background: #0f172a;
+    color: #ffffff;
+    border-color: #0f172a;
+}
+.wrong-note-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 18px 20px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+.wrong-note-card.resolved {
+    background: #f8fafc;
+    opacity: 0.75;
+    border-color: #cbd5e1;
+}
+.note-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.badge-note-type {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+}
+.badge-note-type.journal { background: #fef3c7; color: #b45309; }
+.badge-note-type.theory { background: #dbeafe; color: #1e40af; }
+.badge-wrong-count {
+    padding: 1px 6px;
+    background: #fee2e2;
+    color: #dc2626;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 800;
+}
+.badge-resolved {
+    padding: 2px 8px;
+    background: #dcfce7;
+    color: #15803d;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+.badge-active {
+    padding: 2px 8px;
+    background: #fee2e2;
+    color: #b91c1c;
+    border-radius: 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+.note-book-ref-box {
+    background: #fefce8;
+    border: 1px solid #fef08a;
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+.note-explanation-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.note-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px solid #f1f5f9;
+}
+.btn-note-resolve {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: #dcfce7;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-note-resolve:hover {
+    background: #bbf7d0;
+}
+.btn-note-unresolve {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.btn-note-delete {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    cursor: pointer;
+}
+.btn-note-delete:hover {
+    background: #fca5a5;
 }
