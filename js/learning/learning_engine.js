@@ -17,6 +17,90 @@ window.LearningEngine = (function() {
             .replace(/'/g, '&#039;');
     }
 
+    function formatTheoryOptionHtml(rawText) {
+        if (!rawText) return '';
+        let text = String(rawText).trim();
+
+        // 1. (차) / (대) 분개가 포함된 경우
+        if (/\(차\)/.test(text) && /\(대\)/.test(text)) {
+            const parts = text.split(/(?=\(대\))/);
+            if (parts.length >= 2) {
+                const debitPart = parts[0].trim();
+                const creditPart = parts.slice(1).join(' ').trim();
+                return `
+                    <div class="flex flex-wrap items-center gap-1.5 w-full">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 font-bold text-xs border border-sky-200">${escapeHtml(debitPart)}</span>
+                        <span class="text-slate-300 font-bold text-xs">/</span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-purple-50 text-purple-800 font-bold text-xs border border-purple-200">${escapeHtml(creditPart)}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // 2. 표 형식의 다중 컬럼 데이터 (금액, 회계처리 등이 공백/구분자로 나열된 경우)
+        if (/(\d+[,0-9]*원|\(차\)|\(대\)|회계처리)/.test(text)) {
+            const segments = text.split(/\s{2,}|\t|(?<=원)\s+(?=\d|\(|회|[가-힣])/).map(s => s.trim()).filter(Boolean);
+            if (segments.length >= 2) {
+                return `
+                    <div class="flex flex-wrap items-center gap-2 w-full text-xs font-semibold text-slate-800">
+                        ${segments.map((seg, idx) => {
+                            let badgeStyle = "bg-slate-100 text-slate-700 border-slate-200";
+                            if (seg.includes('(차)')) badgeStyle = "bg-sky-50 text-sky-800 border-sky-200 font-bold";
+                            else if (seg.includes('(대)')) badgeStyle = "bg-purple-50 text-purple-800 border-purple-200 font-bold";
+                            else if (seg.includes('원')) badgeStyle = "bg-amber-50 text-amber-900 border-amber-200 font-mono font-bold";
+                            else if (seg.includes('회계처리')) badgeStyle = "bg-slate-100 text-slate-500 border-slate-200";
+                            
+                            return `
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg border ${badgeStyle}">
+                                    ${escapeHtml(seg)}
+                                </span>
+                                ${idx < segments.length - 1 ? `<span class="text-slate-300 font-bold">|</span>` : ''}
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+        }
+
+        return escapeHtml(text);
+    }
+
+    function formatTheoryQuestionHtml(rawText) {
+        if (!rawText) return '';
+        let text = String(rawText).trim();
+
+        // 지문 뒤에 표 헤더나 자료 목록이 붙은 경우 분리
+        const splitMatch = text.match(/^(.*?(\?|\.|\:))\s*(\n+|(?<=\?)\s+)(.+)$/s);
+        if (splitMatch && splitMatch[4] && splitMatch[4].trim().length > 5) {
+            const qMain = splitMatch[1].trim();
+            const subData = splitMatch[4].trim();
+
+            const subCols = subData.split(/\s{2,}|\t|\n|(?<=잔액)\s+|(?<=\%)\s+|(?<=\))\s+/).map(s => s.trim()).filter(Boolean);
+
+            if (subCols.length >= 2) {
+                return `
+                    <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
+                        ${escapeHtml(qMain).replace(/\n/g, '<br>')}
+                    </div>
+                    <div class="theory-question-data-box p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                        <div class="flex items-center gap-1.5 font-extrabold text-slate-700 border-b border-slate-200/80 pb-1.5 mb-2">
+                            <span class="text-indigo-600">📋</span>
+                            <span>보기 표 헤더 / 문제 자료</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 font-bold text-slate-700">
+                            ${subCols.map((col, cIdx) => `
+                                <span class="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-slate-800">${escapeHtml(col)}</span>
+                                ${cIdx < subCols.length - 1 ? '<span class="text-slate-300 font-bold">|</span>' : ''}
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        return escapeHtml(text).replace(/\n/g, '<br>');
+    }
+
     async function initLearningApp() {
         const container = document.getElementById('learning-content-container');
         if (!container) return;
@@ -591,7 +675,7 @@ window.LearningEngine = (function() {
                             </div>
 
                             <div class="quiz-question-text mt-3" id="l-theory-question">
-                                ${escapeHtml(currentStep.quiz.question).replace(/\n/g, '<br>')}
+                                ${formatTheoryQuestionHtml(currentStep.quiz.question)}
                             </div>
 
                             <div class="quiz-options-list mt-3" id="quiz-options-group">
@@ -599,7 +683,7 @@ window.LearningEngine = (function() {
                                     <label class="quiz-option-item" onclick="LearningEngine.selectOption(${oIdx + 1})">
                                         <input type="radio" name="learning_opt" value="${oIdx + 1}">
                                         <span class="opt-num">${oIdx + 1}</span>
-                                        <span class="opt-text">${escapeHtml(opt)}</span>
+                                        <span class="opt-text">${formatTheoryOptionHtml(opt)}</span>
                                     </label>
                                 `).join('')}
                             </div>
@@ -1320,7 +1404,7 @@ window.LearningEngine = (function() {
             const qCard = document.getElementById('learning-theory-quiz-card');
             if (qCard) {
                 const qText = qCard.querySelector('#l-theory-question');
-                if (qText) qText.innerHTML = escapeHtml(currentExtraQuiz.question).replace(/\n/g, '<br>');
+                if (qText) qText.innerHTML = formatTheoryQuestionHtml(currentExtraQuiz.question);
 
                 const optionsGroup = qCard.querySelector('#quiz-options-group');
                 if (optionsGroup && currentExtraQuiz.options.length > 0) {
@@ -1328,7 +1412,7 @@ window.LearningEngine = (function() {
                         <label class="quiz-option-item" onclick="LearningEngine.selectOption(${oIdx + 1})">
                             <input type="radio" name="learning_opt" value="${oIdx + 1}">
                             <span class="opt-num">${oIdx + 1}</span>
-                            <span class="opt-text">${escapeHtml(opt)}</span>
+                            <span class="opt-text">${formatTheoryOptionHtml(opt)}</span>
                         </label>
                     `).join('');
                 }
