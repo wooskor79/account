@@ -16,11 +16,20 @@ $show_lock_gate = $is_private && !$is_admin;
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>학습 자료실 및 문제풀이</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>전산회계 자료실</title>
+    
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+    window.onerror = function(msg, url, lineNo, columnNo, error) {
+        alert("JS Error: " + msg + "\nURL: " + url + "\nLine: " + lineNo + ":" + columnNo);
+        return false;
+    };
+    window.addEventListener('unhandledrejection', function(event) {
+        alert("Promise Error: " + event.reason);
+    });
+    
     // window.alert -> 세련된 커스텀 모달로 재정의
     (function() {
         window.alert = function(message) {

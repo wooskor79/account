@@ -27,7 +27,10 @@ function extractQuizTagKey(text) {
     let match = text.match(/\[(.*?)\]/);
     if (!match) return null;
     let tag = match[1].replace(/\s+/g, '');
-    let roundMatch = tag.match(/(\d+)회.*?#?(\d+)/);
+    let roundMatch = tag.match(/([0-9]+)회.*?#([0-9]+)/);
+    if (!roundMatch) {
+        roundMatch = tag.match(/([0-9]+)회.*?(?:기출|문제).*?([0-9]+)/);
+    }
     if (roundMatch) {
         return `round_${roundMatch[1]}_${roundMatch[2]}`;
     }
