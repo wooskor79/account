@@ -222,10 +222,12 @@ function openQuizApp(mode, level = '2급') {
     currentQuizLevel = level;
     isWrongQuizMode = false;
 
+    document.body.classList.remove('learning-app-active');
     document.getElementById('quiz-menu-dropdown')?.classList.add('hidden');
     document.getElementById('quiz1-menu-dropdown')?.classList.add('hidden');
     document.getElementById('main-content-view')?.classList.add('hidden');
     document.getElementById('learning-course-view')?.classList.add('hidden');
+    if (document.getElementById('learning-course-view')) document.getElementById('learning-course-view').style.display = 'none';
     document.getElementById('quiz-content-view')?.classList.remove('hidden');
 
     const journalContainer = document.getElementById('journal-quiz-container');

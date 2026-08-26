@@ -170,9 +170,16 @@ window.LearningEngine = (function() {
     }
 
     function closeLogoutModal(e) {
-        if (e && e.target && e.target.id !== 'learning-logout-modal' && !e.target.classList.contains('btn-modal-cancel')) return;
+        if (e && e.target && e.target.id !== 'learning-logout-modal' && !e.target.classList.contains('btn-custom-modal-cancel')) return;
         const modal = document.getElementById('learning-logout-modal');
         if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmLogout() {
+        const modal = document.getElementById('learning-logout-modal');
+        if (modal) modal.style.display = 'none';
+        await window.LearningAuth.logout();
+        renderAuthView('login');
     }
 
     function resumeLastLearning() {
@@ -217,10 +224,16 @@ window.LearningEngine = (function() {
             if (saved) lastPosInfo = JSON.parse(saved);
         } catch(e) {}
 
-        // 전체 진도율 계산
+        // 전체 진도율 및 단원 완료 수 계산
         let totalSteps = 0;
         let completedStepsCount = 0;
+        let completedSectionsCount = 0;
+
         curriculum.sections.forEach(sec => {
+            let sDone = sec.steps.filter(st => (prog.completed_steps || []).includes(st.id)).length;
+            if (sDone === sec.steps.length && sec.steps.length > 0) {
+                completedSectionsCount++;
+            }
             sec.steps.forEach(st => {
                 totalSteps++;
                 if ((prog.completed_steps || []).includes(st.id)) {
@@ -228,6 +241,7 @@ window.LearningEngine = (function() {
                 }
             });
         });
+
         const totalPct = totalSteps > 0 ? Math.round((completedStepsCount / totalSteps) * 100) : 0;
         const wrongCount = (prog.wrong_notes || []).filter(n => !n.resolved).length;
 
@@ -277,12 +291,12 @@ window.LearningEngine = (function() {
 
                     <!-- 전체 진도율 게이지 바 -->
                     <div class="mt-5 pt-4 border-t border-slate-200/80">
-                        <div class="flex justify-between items-center mb-1.5">
+                        <div class="flex justify-between items-center mb-1.5 flex-wrap gap-1">
                             <span class="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
-                                📈 전체 코스 달성률
+                                📈 전체 7대 단원 달성률: <strong>${completedSectionsCount} / 7개 단원 완료</strong>
                             </span>
                             <span class="text-xs font-extrabold text-blue-600">
-                                ${completedStepsCount} / ${totalSteps} 단계 (${totalPct}%)
+                                총 ${completedStepsCount} / ${totalSteps}단계 (${totalPct}%)
                             </span>
                         </div>
                         <div class="w-full bg-slate-200/80 rounded-full h-3 overflow-hidden shadow-inner">

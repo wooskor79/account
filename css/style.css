@@ -1509,6 +1509,13 @@ body { height: auto; overflow-y: auto; }
     font-weight: 800;
     border-radius: 9999px;
 }
+/* 맞춤 학습 활성화 시 바디 전체 스크롤 허용 */
+body.learning-app-active {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+}
+
 /* 1급 맞춤 학습 뷰 스크롤 및 전체 높이 컨테이너 */
 #learning-course-view.hidden {
     display: none !important;
@@ -1520,12 +1527,7 @@ body { height: auto; overflow-y: auto; }
     max-width: 1200px;
     margin: 0 auto;
     flex: 1;
-    overflow-y: auto !important;
-    overflow-x: hidden;
-    height: calc(100vh - 75px);
-    max-height: calc(100vh - 75px);
-    padding-bottom: 100px;
-    -webkit-overflow-scrolling: touch;
+    padding-bottom: 120px;
 }
 #learning-course-view::-webkit-scrollbar {
     width: 8px;
