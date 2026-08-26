@@ -449,6 +449,8 @@ window.LearningEngine = (function() {
                             let totalWeight = 0;
                             let acquiredWeight = 0;
                             let isSectionAllDone = true;
+                            let remainTheoryCount = 0;
+                            let remainJournalCount = 0;
 
                             sec.steps.forEach(st => {
                                 const isDone = (prog.completed_steps || []).includes(st.id);
@@ -464,13 +466,15 @@ window.LearningEngine = (function() {
                                     const curJ = Math.min(reqJ, counts.journal || 0);
                                     acquiredWeight += (curT + curJ);
                                     totalWeight += maxScore;
+                                    remainTheoryCount += Math.max(0, reqT - curT);
+                                    remainJournalCount += Math.max(0, reqJ - curJ);
                                 }
                             });
 
                             let sPct = totalWeight > 0 ? Math.round((acquiredWeight / totalWeight) * 100) : 0;
                             let isComplete = isSectionAllDone && sPct === 100;
 
-                            // 100% 미완성일 때 경고 가이드 문구 및 버튼 텍스트 최적화
+                            // 100% 미완성일 때 잔여 문제 수 명시
                             let incompleteWarning = '';
                             let btnText = '학습 시작하기 ➜';
                             if (sPct > 0) {
@@ -478,9 +482,15 @@ window.LearningEngine = (function() {
                                     btnText = '다시 복습하기 ➜';
                                 } else {
                                     btnText = '문제를 더 풀고 완수하기 ➜';
+                                    let remainParts = [];
+                                    if (remainTheoryCount > 0) remainParts.push(`필기 ${remainTheoryCount}문제`);
+                                    if (remainJournalCount > 0) remainParts.push(`분개 ${remainJournalCount}문제`);
+                                    let remainStr = remainParts.join(', ');
+
                                     incompleteWarning = `
-                                        <div class="text-[10px] text-amber-600 font-bold bg-amber-50/50 border border-amber-100 rounded-lg py-1.5 px-2.5 mt-2 flex items-center gap-1">
-                                            <span>⚠️ 완성을 위해 문제를 더 풀어야 합니다 (${sPct}% 진행)</span>
+                                        <div class="text-[10px] text-amber-700 font-bold bg-amber-50 border border-amber-200/80 rounded-lg py-1.5 px-2.5 mt-2 flex items-center gap-1.5 shadow-2xs">
+                                            <span class="text-amber-500 text-xs">⚠️</span>
+                                            <span>완료까지 <strong>${remainStr}</strong> 남음 (${sPct}%)</span>
                                         </div>
                                     `;
                                 }
@@ -610,21 +620,21 @@ window.LearningEngine = (function() {
                 <div class="mt-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row justify-between gap-3 text-xs">
                     <div class="flex items-start sm:items-center gap-1.5">
                         <span class="font-extrabold text-slate-800 flex items-center gap-1 flex-shrink-0">🎯 단계 완수 조건:</span>
-                        <span class="text-slate-500 font-semibold leading-relaxed">각 유형 문제를 반복해서 풀어 각각 최소 3번 정답을 맞춰야 최종 통과됩니다.</span>
+                        <span class="text-slate-500 font-semibold leading-relaxed">각 유형별로 최소 3문제를 맞추면 이 단계가 완수됩니다.</span>
                     </div>
-                    <div class="flex gap-3.5 font-bold flex-wrap items-center mt-1 sm:mt-0">
+                    <div class="flex gap-2.5 font-bold flex-wrap items-center mt-1 sm:mt-0" id="step-target-board">
                         ${currentStep.quiz ? `
-                            <span class="flex items-center gap-1.5 ${tCorrect >= 3 ? 'text-emerald-600' : 'text-amber-600 bg-amber-50/50 px-2 py-0.5 rounded-lg border border-amber-100'}">
-                                <span>📝 이론 필기:</span>
-                                <strong class="text-xs">${tCorrect}/3회</strong>
-                                ${tCorrect >= 3 ? '✅' : '⏳'}
+                            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${tCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                                <span>📝 필기:</span>
+                                <strong class="text-xs font-mono">${tCorrect}/3회</strong>
+                                ${tCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - tCorrect}문제 더 필요)</span>`}
                             </span>
                         ` : ''}
                         ${currentStep.journalQuiz ? `
-                            <span class="flex items-center gap-1.5 ${jCorrect >= 3 ? 'text-emerald-600' : 'text-amber-600 bg-amber-50/50 px-2 py-0.5 rounded-lg border border-amber-100'}">
-                                <span>⚖️ 실무 분개:</span>
-                                <strong class="text-xs">${jCorrect}/3회</strong>
-                                ${jCorrect >= 3 ? '✅' : '⏳'}
+                            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${jCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                                <span>⚖️ 분개:</span>
+                                <strong class="text-xs font-mono">${jCorrect}/3회</strong>
+                                ${jCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - jCorrect}문제 더 필요)</span>`}
                             </span>
                         ` : ''}
                     </div>
@@ -1280,6 +1290,17 @@ window.LearningEngine = (function() {
         const step = section ? section.steps.find(st => st.id === stepId) : null;
         if (!step) return;
 
+        // 1. [방안 A] 동적 회계 문제 생성기 우선 호출 (실시간 무한 변형 문제)
+        if (window.LearningGenerator && typeof window.LearningGenerator.generateDynamicQuiz === 'function') {
+            const dynQuiz = window.LearningGenerator.generateDynamicQuiz(stepId, sectionId, type);
+            if (dynQuiz) {
+                currentExtraQuiz = dynQuiz;
+                applyExtraQuizToUI(stepId, sectionId, type);
+                return;
+            }
+        }
+
+        // 2. 폴백: 엑셀 파일셋 비동기 로딩 및 1:1 파싱
         const keywords = step.keywords || [];
         if (keywords.length === 0) {
             alert('이 단원은 유사문제용 검색 키워드가 준비되지 않았습니다.');
@@ -1399,6 +1420,14 @@ window.LearningEngine = (function() {
             explanation: chosenAns.explanation || '추가 해설이 없습니다.',
             bookReference: bookRefText
         };
+
+        applyExtraQuizToUI(stepId, sectionId, type);
+    }
+
+    function applyExtraQuizToUI(stepId, sectionId, type) {
+        if (!currentExtraQuiz) return;
+        const feedbackBoxId = type === 'theory' ? 'quiz-feedback-box' : 'journal-feedback-box';
+        const fbBox = document.getElementById(feedbackBoxId);
 
         if (type === 'theory') {
             const qCard = document.getElementById('learning-theory-quiz-card');
@@ -1929,21 +1958,21 @@ window.LearningEngine = (function() {
             board.innerHTML = `
                 <div class="flex items-start sm:items-center gap-1.5">
                     <span class="font-extrabold text-slate-800 flex items-center gap-1 flex-shrink-0">🎯 단계 완수 조건:</span>
-                    <span class="text-slate-500 font-semibold leading-relaxed">각 유형 문제를 반복해서 풀어 각각 최소 3번 정답을 맞춰야 최종 통과됩니다.</span>
+                    <span class="text-slate-500 font-semibold leading-relaxed">각 유형별로 최소 3문제를 맞추면 이 단계가 완수됩니다.</span>
                 </div>
-                <div class="flex gap-3.5 font-bold flex-wrap items-center mt-1 sm:mt-0">
+                <div class="flex gap-2.5 font-bold flex-wrap items-center mt-1 sm:mt-0" id="step-target-board">
                     ${currentStep.quiz ? `
-                        <span class="flex items-center gap-1.5 ${tCorrect >= 3 ? 'text-emerald-600' : 'text-amber-600 bg-amber-50/50 px-2 py-0.5 rounded-lg border border-amber-100'}">
-                            <span>📝 이론 필기:</span>
-                            <strong class="text-xs">${tCorrect}/3회</strong>
-                            ${tCorrect >= 3 ? '✅' : '⏳'}
+                        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${tCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                            <span>📝 필기:</span>
+                            <strong class="text-xs font-mono">${tCorrect}/3회</strong>
+                            ${tCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - tCorrect}문제 더 필요)</span>`}
                         </span>
                     ` : ''}
                     ${currentStep.journalQuiz ? `
-                        <span class="flex items-center gap-1.5 ${jCorrect >= 3 ? 'text-emerald-600' : 'text-amber-600 bg-amber-50/50 px-2 py-0.5 rounded-lg border border-amber-100'}">
-                            <span>⚖️ 실무 분개:</span>
-                            <strong class="text-xs">${jCorrect}/3회</strong>
-                            ${jCorrect >= 3 ? '✅' : '⏳'}
+                        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border ${jCorrect >= 3 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200'}">
+                            <span>⚖️ 분개:</span>
+                            <strong class="text-xs font-mono">${jCorrect}/3회</strong>
+                            ${jCorrect >= 3 ? '<span class="text-[11px] font-extrabold text-emerald-600">✅ 완료</span>' : `<span class="text-[11px] font-bold text-amber-600">(${3 - jCorrect}문제 더 필요)</span>`}
                         </span>
                     ` : ''}
                 </div>

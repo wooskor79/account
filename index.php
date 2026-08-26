@@ -726,6 +726,7 @@ $show_lock_gate = $is_private && !$is_admin;
     <script src="js/learning/learning_curriculum.js?v=<?php echo time(); ?>"></script>
     <script src="js/learning/learning_auth.js?v=<?php echo time(); ?>"></script>
     <script src="js/learning/learning_wrong_notes.js?v=<?php echo time(); ?>"></script>
+    <script src="js/learning/learning_generator.js?v=<?php echo time(); ?>"></script>
     <script src="js/learning/learning_engine.js?v=<?php echo time(); ?>"></script>
     <script src="js/main.js?v=<?php echo time(); ?>"></script>
 </body>
