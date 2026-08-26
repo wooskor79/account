@@ -25,6 +25,8 @@ function updateGradeUI() {
     const itemsGrade2 = document.getElementById('quiz-menu-items-grade2');
     const itemsGrade1 = document.getElementById('quiz-menu-items-grade1');
 
+    const learningBtn = document.getElementById('learning-course-nav-btn');
+
     if (logoBadge) {
         logoBadge.textContent = currentGrade === 'grade1' ? '중급' : '기초';
     }
@@ -35,6 +37,13 @@ function updateGradeUI() {
         } else {
             gradeBtn.textContent = '중급이동';
             gradeBtn.style.color = 'var(--accounting-point)';
+        }
+    }
+    if (learningBtn) {
+        if (currentGrade === 'grade1') {
+            learningBtn.classList.remove('hidden');
+        } else {
+            learningBtn.classList.add('hidden');
         }
     }
     if (quizBtn) {

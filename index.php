@@ -83,8 +83,8 @@ $show_lock_gate = $is_private && !$is_admin;
                 💻 PC화면
             </button>
 
-            <!-- 1급 맞춤 학습하기 전용 진입 버튼 -->
-            <button id="learning-course-nav-btn" onclick="openLearningCourseApp()" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] sm:text-xs font-extrabold px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center gap-1.5 ml-2" title="2026 PERFECT 전산회계 1급 교재 기반 맞춤 코스 학습">
+            <!-- 1급 맞춤 학습하기 전용 진입 버튼 (1급/중급 모드에서만 노출) -->
+            <button id="learning-course-nav-btn" onclick="openLearningCourseApp()" class="hidden bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[11px] sm:text-xs font-extrabold px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center gap-1.5 ml-2" title="2026 PERFECT 전산회계 1급 교재 기반 맞춤 코스 학습">
                 📖 1급 맞춤학습
             </button>
 

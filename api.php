@@ -323,6 +323,7 @@ if ($action) {
         
         if ($entered_pass === $admin_password) {
             $_SESSION['admin'] = true;
+            unset($_SESSION['learning_user']); // 사이트 재접속 시 학습자 세션도 초기화
             echo json_encode([
                 'success' => true,
                 'is_admin' => true,
@@ -331,7 +332,8 @@ if ($action) {
             ]);
             exit;
         } else if ($entered_pass === $gate_password) {
-            // 일반 접속자는 일회성으로 통과 (세션에 기록하지 않음 -> 새로고침 시 다시 비번 요구)
+            // 일반 접속자는 일회성으로 통과 (새로고침 시 다시 비번 요구 및 학습자 세션 초기화)
+            unset($_SESSION['learning_user']);
             echo json_encode([
                 'success' => true,
                 'is_admin' => false,

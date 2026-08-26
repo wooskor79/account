@@ -1509,23 +1509,97 @@ body { height: auto; overflow-y: auto; }
     font-weight: 800;
     border-radius: 9999px;
 }
-.btn-learning-logout {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: #f1f5f9;
+.btn-learning-logout-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 12px;
+    background: #f8fafc;
     border: 1px solid #e2e8f0;
     color: #64748b;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.15s ease;
 }
-.btn-learning-logout:hover {
+.btn-learning-logout-text:hover {
     background: #fee2e2;
     color: #dc2626;
     border-color: #fca5a5;
+    transform: translateY(-1px);
+}
+
+/* 로그아웃 커스텀 웹 모달 팝업 */
+.learning-custom-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.learning-custom-modal-content {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 28px 24px;
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.2);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes modalPopIn {
+    0% { transform: scale(0.95); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+.modal-emoji-badge {
+    width: 52px;
+    height: 52px;
+    background: #fee2e2;
+    border-radius: 18px;
+    font-size: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.btn-custom-modal-cancel {
+    padding: 9px 18px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-custom-modal-cancel:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+.btn-custom-modal-danger {
+    padding: 9px 20px;
+    background: #dc2626;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    transition: all 0.15s ease;
+}
+.btn-custom-modal-danger:hover {
+    background: #b91c1c;
+    transform: translateY(-1px);
 }
 
 /* 단원 카드 */
