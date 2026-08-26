@@ -1510,13 +1510,21 @@ body { height: auto; overflow-y: auto; }
     border-radius: 9999px;
 }
 /* 1급 맞춤 학습 뷰 스크롤 및 전체 높이 컨테이너 */
-#learning-course-view {
+#learning-course-view.hidden {
+    display: none !important;
+}
+
+#learning-course-view:not(.hidden) {
+    display: block !important;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
     flex: 1;
     overflow-y: auto !important;
     overflow-x: hidden;
     height: calc(100vh - 75px);
     max-height: calc(100vh - 75px);
-    padding-bottom: 80px;
+    padding-bottom: 100px;
     -webkit-overflow-scrolling: touch;
 }
 #learning-course-view::-webkit-scrollbar {
