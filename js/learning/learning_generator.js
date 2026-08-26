@@ -70,12 +70,15 @@ window.LearningGenerator = (function() {
                         }
                     },
                     {
-                        question: `다음은 결산 시 매출채권에 대한 대손충당금을 계산하는 예이다. 올바른 회계처리는?\n결산전 대손충당금잔액 기말 매출채권잔액(대손율 1%) 회계처리`,
+                        // 기존 정적 question 문자열을 제거하고 calc 내부에서 동적 생성하도록 수정
                         calc: () => {
                             const receivable = getRandomInt(40, 100) * 1000000;
                             const prevAllowance = getRandomInt(10, 30) * 10000;
                             const targetAllowance = receivable * 0.01;
                             const diff = targetAllowance - prevAllowance;
+
+                            // 동적 데이터가 포함된 명확한 지문 생성
+                            const dynamicQuestion = `다음은 결산 시 매출채권에 대한 대손충당금을 계산하기 위한 자료이다. 올바른 회계처리는?\n[자료] 결산 전 대손충당금 잔액: ${formatNumber(prevAllowance)}원, 기말 매출채권 잔액: ${formatNumber(receivable)}원 (대손율 1%)`;
 
                             const correctText = `(차) 대손상각비 ${formatNumber(diff)}원 | (대) 대손충당금 ${formatNumber(diff)}원`;
                             const wrong1 = `(차) 대손상각비 ${formatNumber(targetAllowance)}원 | (대) 대손충당금 ${formatNumber(targetAllowance)}원`;
@@ -83,6 +86,7 @@ window.LearningGenerator = (function() {
                             const wrong3 = `(차) 대손충당금 ${formatNumber(diff)}원 | (대) 대손충당금환입 ${formatNumber(diff)}원`;
 
                             return {
+                                question: dynamicQuestion, // 생성된 동적 지문 반환
                                 options: [correctText, wrong1, wrong2, wrong3],
                                 correctIdx: 0,
                                 explanation: `목표 대손충당금 = ${formatNumber(receivable)}원 × 1% = ${formatNumber(targetAllowance)}원입니다. 보충할 금액 = ${formatNumber(targetAllowance)}원 - 기존잔액 ${formatNumber(prevAllowance)}원 = ${formatNumber(diff)}원입니다.`
@@ -98,7 +102,7 @@ window.LearningGenerator = (function() {
                 return {
                     id: 'dyn_asset_01_t_' + Date.now(),
                     type: 'theory',
-                    question: tpl.question,
+                    question: res.question || tpl.question, // calc에서 생성된 question이 있으면 우선 사용
                     options: shuffled.options,
                     correctAnswer: shuffled.correctAnswer,
                     explanation: res.explanation,
@@ -133,17 +137,20 @@ window.LearningGenerator = (function() {
                 const unitPrice = getRandomInt(10, 50) * 1000;
                 const totalLoss = lossQty * unitPrice;
 
+                const rawOptions = [
+                    `영업외비용인 '재고자산감모손실' ${formatNumber(totalLoss)}원으로 처리하고 대변 원재료에 적요 8번(타계정대체)을 적용한다.`,
+                    `매출원가에 가산하고 대변 원재료에 적요 8번을 적용하지 않는다.`,
+                    `판매비와관리비인 '감모상각비'로 처리한다.`,
+                    `자산의 차감계정인 '재고자산평가충당금'으로 회계처리한다.`
+                ];
+                const shuffled = shuffleOptions(rawOptions, 0);
+
                 return {
                     id: 'dyn_asset_02_t_' + Date.now(),
                     type: 'theory',
                     question: `기말 재고실사 결과 원재료 장부수량 ${qty}개(단가 ${formatNumber(unitPrice)}원) 중 ${lossQty}개가 도난으로 분실되었으며, 비정상적인 감모손실로 판명되었다. 이에 대한 설명으로 옳은 것은?`,
-                    options: [
-                        `영업외비용인 '재고자산감모손실' ${formatNumber(totalLoss)}원으로 처리하고 대변 원재료에 적요 8번(타계정대체)을 적용한다.`,
-                        `매출원가에 가산하고 대변 원재료에 적요 8번을 적용하지 않는다.`,
-                        `판매비와관리비인 '감모상각비'로 처리한다.`,
-                        `자산의 차감계정인 '재고자산평가충당금'으로 회계처리한다.`
-                    ],
-                    correctAnswer: 1,
+                    options: shuffled.options,
+                    correctAnswer: shuffled.correctAnswer,
                     explanation: `비정상적인 재고자산 감모손실(${lossQty}개 × ${formatNumber(unitPrice)}원 = ${formatNumber(totalLoss)}원)은 영업외비용 항목인 '재고자산감모손실'로 처리하고, 대변 원재료 계정에 적요 8번(타계정으로 대체)을 반드시 기재합니다.`,
                     bookReference: '2026 PERFECT 1급 교재 p.88 [재고자산 감모손실과 평가손실]'
                 };
@@ -179,17 +186,20 @@ window.LearningGenerator = (function() {
                 const gainLossText = isGain ? `유형자산처분이익 ${formatNumber(gainLoss)}원` : `유형자산처분손실 ${formatNumber(Math.abs(gainLoss))}원`;
                 const wrongGainLoss = isGain ? `유형자산처분손실 ${formatNumber(gainLoss)}원` : `유형자산처분이익 ${formatNumber(Math.abs(gainLoss))}원`;
 
+                const rawOptions = [
+                    gainLossText,
+                    wrongGainLoss,
+                    `유형자산처분이익 ${formatNumber(cost - sell)}원`,
+                    `감가상각비 ${formatNumber(dep)}원`
+                ];
+                const shuffled = shuffleOptions(rawOptions, 0);
+
                 return {
                     id: 'dyn_asset_03_t_' + Date.now(),
                     type: 'theory',
                     question: `${comp}는 보유 중이던 기계장치(취득원가 ${formatNumber(cost)}원, 감가상각누계액 ${formatNumber(dep)}원)를 ${formatNumber(sell)}원에 처분하고 대금은 월말에 받기로 하였다. 손익계산서에 반영될 손익은?`,
-                    options: [
-                        gainLossText,
-                        wrongGainLoss,
-                        `유형자산처분이익 ${formatNumber(cost - sell)}원`,
-                        `감가상각비 ${formatNumber(dep)}원`
-                    ],
-                    correctAnswer: 1,
+                    options: shuffled.options,
+                    correctAnswer: shuffled.correctAnswer,
                     explanation: `장부가액 = 취득원가(${formatNumber(cost)}원) - 감가상각누계액(${formatNumber(dep)}원) = ${formatNumber(bookVal)}원입니다.\n처분손익 = 처분가액(${formatNumber(sell)}원) - 장부가액(${formatNumber(bookVal)}원) = ${gainLossText}입니다.`,
                     bookReference: '2026 PERFECT 1급 교재 p.112 [유형자산의 처분]'
                 };
@@ -238,17 +248,20 @@ window.LearningGenerator = (function() {
                 const tax = Math.round(totalSalary * 0.09);
                 const netPay = totalSalary - tax;
 
+                const rawOptions = [
+                    "예수금 (유동부채)",
+                    "선수금 (유동부채)",
+                    "미지급비용 (유동부채)",
+                    "세금과공과 (판매비와관리비)"
+                ];
+                const shuffled = shuffleOptions(rawOptions, 0);
+
                 return {
                     id: 'dyn_liab_t_' + Date.now(),
                     type: 'theory',
                     question: `${comp}는 본사 관리부 직원들의 급여 총액 ${formatNumber(totalSalary)}원을 지급하면서 소득세 및 4대보험료 ${formatNumber(tax)}원을 원천징수하고 잔액 ${formatNumber(netPay)}원을 보통예금으로 이체하였다. 원천징수한 금액 ${formatNumber(tax)}원의 올바른 계정과목은?`,
-                    options: [
-                        "예수금 (유동부채)",
-                        "선수금 (유동부채)",
-                        "미지급비용 (유동부채)",
-                        "세금과공과 (판매비와관리비)"
-                    ],
-                    correctAnswer: 1,
+                    options: shuffled.options,
+                    correctAnswer: shuffled.correctAnswer,
                     explanation: `급여 지급 시 소득세, 지방소득세, 건강보험료, 국민연금 등 원천징수한 세액과 보험료는 임시로 보관하는 유동부채인 '예수금'으로 처리합니다.`,
                     bookReference: '2026 PERFECT 1급 교재 p.150 [유동부채 - 예수금]'
                 };
@@ -283,17 +296,20 @@ window.LearningGenerator = (function() {
                 const cap = shares * par;
                 const premium = shares * (issue - par);
 
+                const rawOptions = [
+                    formatNumber(cap + premium) + '원',
+                    formatNumber(cap) + '원',
+                    formatNumber(premium) + '원',
+                    formatNumber(shares * issue) + '원'
+                ];
+                const shuffled = shuffleOptions(rawOptions, 0);
+
                 return {
                     id: 'dyn_eq_t_' + Date.now(),
                     type: 'theory',
                     question: `당사는 보통주식 ${formatNumber(shares)}주(액면가액 1주당 ${formatNumber(par)}원)를 1주당 ${formatNumber(issue)}원에 할증발행하고 주금 납입액 전액이 보통예금으로 입금되었다. 이 거래로 인하여 증가하는 자본금의 금액은?`,
-                    options: [
-                        formatNumber(cap) + '원',
-                        formatNumber(cap + premium) + '원',
-                        formatNumber(premium) + '원',
-                        formatNumber(shares * issue) + '원'
-                    ],
-                    correctAnswer: 1,
+                    options: shuffled.options,
+                    correctAnswer: shuffled.correctAnswer,
                     explanation: `주식 발행 시 '자본금'은 무조건 '발행주식수 × 액면가액'(${formatNumber(shares)}주 × ${formatNumber(par)}원 = ${formatNumber(cap)}원)으로만 증가합니다. 액면초과액(${formatNumber(premium)}원)은 '주식발행초과금(자본잉여금)'으로 처리됩니다.`,
                     bookReference: '2026 PERFECT 1급 교재 p.184 [주식의 발행과 자본금]'
                 };
@@ -334,17 +350,20 @@ window.LearningGenerator = (function() {
                 const ansText = isUnder ? `과소배부 ${formatNumber(diff)}원` : `과대배부 ${formatNumber(Math.abs(diff))}원`;
                 const wrongText = isUnder ? `과대배부 ${formatNumber(diff)}원` : `과소배부 ${formatNumber(Math.abs(diff))}원`;
 
+                const rawOptions = [
+                    ansText,
+                    wrongText,
+                    `과소배부 ${formatNumber(estimated)}원`,
+                    `과대배부 ${formatNumber(actual)}원`
+                ];
+                const shuffled = shuffleOptions(rawOptions, 0);
+
                 return {
                     id: 'dyn_cost_t_' + Date.now(),
                     type: 'theory',
                     question: `당사는 제조간접비를 직접노동시간을 기준으로 예정배부하고 있다. 당기 예정배부율은 직접노동시간당 ${formatNumber(rate)}원이며, 당기 실제 직접노동시간은 ${formatNumber(directLaborHours)}시간이었다. 당기 실제 제조간접비 발생액이 ${formatNumber(actual)}원일 때, 제조간접비 배부차이는?`,
-                    options: [
-                        ansText,
-                        wrongText,
-                        `과소배부 ${formatNumber(estimated)}원`,
-                        `과대배부 ${formatNumber(actual)}원`
-                    ],
-                    correctAnswer: 1,
+                    options: shuffled.options,
+                    correctAnswer: shuffled.correctAnswer,
                     explanation: `예정배부액 = 실제조업도(${formatNumber(directLaborHours)}시간) × 예정배부율(${formatNumber(rate)}원) = ${formatNumber(estimated)}원입니다.\n배부차이 = 예정배부액(${formatNumber(estimated)}원) - 실제발생액(${formatNumber(actual)}원) = ${ansText}입니다. (실제발생액이 예정배부액보다 크면 배부가 덜 된 것이므로 과소배부입니다.)`,
                     bookReference: '2026 PERFECT 1급 교재 p.240 [제조간접비 예정배부 및 배부차이]'
                 };
@@ -372,17 +391,21 @@ window.LearningGenerator = (function() {
         // [단원 7. 부가가치세]
         'sec_vat': {
             theory: function() {
+                const rawOptions = [
+                    `공장 생산직 직원의 복리후생비 성격의 작업복 구입 매입세액`,
+                    `영업용 화물차(1톤 트럭) 구입 관련 매입세액`,
+                    `본사 총무부 업무용 2,000cc 개별소비세 과세대상 승용차 구입 및 유지 관련 매입세액`,
+                    `과세사업에 사용하기 위해 취득한 원재료 매입세액`
+                ];
+                // 기존 코드는 3번째(index 2)가 정답이었습니다. 보기 순서를 위와 같이 재배치하고 0번 인덱스를 정답으로 셔플합니다.
+                const shuffled = shuffleOptions(rawOptions, 2); // '개별소비세 과세대상...' 이 정답(인덱스 2)
+
                 return {
                     id: 'dyn_vat_t_' + Date.now(),
                     type: 'theory',
                     question: `다음 중 부가가치세법상 매입세액공제가 불가능한(불공제) 항목으로 옳은 것은?`,
-                    options: [
-                        `영업용 화물차(1톤 트럭) 구입 관련 매입세액`,
-                        `본사 총무부 업무용 2,000cc 개별소비세 과세대상 승용차 구입 및 유지 관련 매입세액`,
-                        `공장 생산직 직원의 복리후생비 성격의 작업복 구입 매입세액`,
-                        `과세사업에 사용하기 위해 취득한 원재료 매입세액`
-                    ],
-                    correctAnswer: 2,
+                    options: shuffled.options,
+                    correctAnswer: shuffled.correctAnswer,
                     explanation: `개별소비세 과세대상 승용차(비영업용 소형승용차: 8인승 이하 승용차로서 배기량 1,000cc 초과)의 구입·임차·유지 관련 매입세액은 부가가치세법 제39조에 따라 불공제(매입세액 불공제) 대상입니다. (1톤 트럭이나 9인승 이상 승합차, 1,000cc 이하 경차는 공제 가능)`,
                     bookReference: '2026 PERFECT 1급 교재 p.310 [매입세액 불공제 항목]'
                 };
