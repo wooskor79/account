@@ -1237,27 +1237,53 @@ window.LearningEngine = (function() {
             return;
         }
 
-        let allProblems = [];
-        let allAnswers = [];
+        let allProblemsWithAnswers = [];
 
         targetExcelFiles.forEach(file => {
             const cache = window.quizDataCache && window.quizDataCache[file.name];
             if (cache) {
-                if (cache.problemsMapArr) allProblems.push(...cache.problemsMapArr);
-                if (cache.answersMapArr) allAnswers.push(...cache.answersMapArr);
-                if (cache.theoryProblemsMapArr) allProblems.push(...cache.theoryProblemsMapArr);
-                if (cache.theoryAnswersMapArr) allAnswers.push(...cache.theoryAnswersMapArr);
+                if (type === 'journal') {
+                    const probMap = new Map(cache.problemsMapArr || []);
+                    const ansMap = new Map(cache.answersMapArr || []);
+                    probMap.forEach((probObj, id) => {
+                        const ansObj = ansMap.get(id);
+                        if (ansObj) {
+                            allProblemsWithAnswers.push({
+                                fileSource: file.name,
+                                id: `${file.name}_${id}`,
+                                originalId: id,
+                                prob: probObj,
+                                ans: ansObj
+                            });
+                        }
+                    });
+                } else {
+                    const probMap = new Map(cache.theoryProblemsMapArr || []);
+                    const ansMap = new Map(cache.theoryAnswersMapArr || []);
+                    probMap.forEach((probObj, id) => {
+                        const ansObj = ansMap.get(id);
+                        if (ansObj) {
+                            allProblemsWithAnswers.push({
+                                fileSource: file.name,
+                                id: `${file.name}_${id}`,
+                                originalId: id,
+                                prob: probObj,
+                                ans: ansObj
+                            });
+                        }
+                    });
+                }
             }
         });
 
-        if (allProblems.length === 0) {
+        if (allProblemsWithAnswers.length === 0) {
             alert('문제를 불러왔으나 파싱된 데이터가 존재하지 않습니다.');
             if (fbBox) fbBox.classList.add('hidden');
             return;
         }
 
-        const filtered = allProblems.filter(p => {
-            const probObj = p[1];
+        const filtered = allProblemsWithAnswers.filter(item => {
+            const probObj = item.prob;
             const text = (probObj.text || '').replace(/\s+/g, '');
             const category = (probObj.category || '').replace(/\s+/g, '');
             return keywords.some(k => text.includes(k) || category.includes(k));
@@ -1270,19 +1296,16 @@ window.LearningEngine = (function() {
         }
 
         const chosen = filtered[Math.floor(Math.random() * filtered.length)];
-        const chosenId = chosen[0];
-        const chosenProb = chosen[1];
-        const ansPair = allAnswers.find(a => a[0] === chosenId);
-        const chosenAns = ansPair ? ansPair[1] : null;
+        const chosenProb = chosen.prob;
+        const chosenAns = chosen.ans;
 
-        if (!chosenAns) {
-            alert('문제를 찾았으나 정답/해설 데이터 매칭에 실패했습니다. 다른 문제로 다시 시도해 주세요.');
-            if (fbBox) fbBox.classList.add('hidden');
-            return;
-        }
+        let sourceLabel = chosen.fileSource.replace('.xlsx', '').replace(/_/g, ' ');
+        let bookRefText = `[${sourceLabel} #${chosen.originalId}] ${chosenProb.category || ''}`.trim();
 
         currentExtraQuiz = {
-            id: chosenId,
+            id: chosen.id,
+            originalId: chosen.originalId,
+            fileSource: chosen.fileSource,
             type: type,
             question: chosenProb.text,
             options: chosenProb.choices || [],
@@ -1290,7 +1313,7 @@ window.LearningEngine = (function() {
             debit: chosenAns.debit || [],
             credit: chosenAns.credit || [],
             explanation: chosenAns.explanation || '추가 해설이 없습니다.',
-            bookReference: chosenProb.category || '1급 기출 유사문제'
+            bookReference: bookRefText
         };
 
         if (type === 'theory') {
