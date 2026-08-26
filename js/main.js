@@ -713,6 +713,8 @@ function openLearningCourseApp() {
     const quizView = document.getElementById('quiz-content-view');
     const learningView = document.getElementById('learning-course-view');
 
+    document.body.classList.add('learning-app-active');
+
     if (mainView) {
         mainView.classList.add('hidden');
         mainView.style.display = 'none';
@@ -732,6 +734,7 @@ function openLearningCourseApp() {
 }
 
 function closeLearningCourseApp() {
+    document.body.classList.remove('learning-app-active');
     const mainView = document.getElementById('main-content-view');
     const learningView = document.getElementById('learning-course-view');
     if (learningView) {
@@ -747,6 +750,7 @@ function closeLearningCourseApp() {
 // goHome 글로벌 확장 (학습 뷰도 함께 닫고 메인으로)
 const origGoHome = window.goHome;
 window.goHome = function() {
+    document.body.classList.remove('learning-app-active');
     const learningView = document.getElementById('learning-course-view');
     if (learningView) {
         learningView.classList.add('hidden');
