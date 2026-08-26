@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 2026 PERFECT 전산회계 1급 맞춤 코스 학습 메인 엔진
  */
 window.LearningEngine = (function() {
@@ -164,8 +164,20 @@ window.LearningEngine = (function() {
         }
     }
 
-    async function logout() {
-        if (!confirm('학습에서 로그아웃하시겠습니까?')) return;
+    function showLogoutModal() {
+        const modal = document.getElementById('learning-logout-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeLogoutModal(e) {
+        if (e && e.target && e.target.id !== 'learning-logout-modal' && !e.target.classList.contains('btn-modal-cancel')) return;
+        const modal = document.getElementById('learning-logout-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function confirmLogout() {
+        const modal = document.getElementById('learning-logout-modal');
+        if (modal) modal.style.display = 'none';
         await window.LearningAuth.logout();
         renderAuthView('login');
     }
@@ -217,14 +229,16 @@ window.LearningEngine = (function() {
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2.5">
                             <button class="btn-learning-wrong-notes" onclick="LearningWrongNotes.renderWrongNotesView(document.getElementById('learning-content-container'))">
-                                <i class="fa-solid fa-book-bookmark text-rose-500"></i>
+                                <span class="text-rose-500">📝</span>
                                 <span>오답노트</span>
                                 <span class="badge-wrong-pill ${wrongCount > 0 ? 'active' : ''}">${wrongCount}</span>
                             </button>
-                            <button class="btn-learning-logout" onclick="LearningEngine.logout()" title="로그아웃">
-                                <i class="fa-solid fa-right-from-bracket"></i>
+                            <!-- 명확한 텍스트 로그아웃 버튼 -->
+                            <button class="btn-learning-logout-text" onclick="LearningEngine.showLogoutModal()" title="학습 종료 및 로그아웃">
+                                <span>🚪</span>
+                                <span>로그아웃</span>
                             </button>
                         </div>
                     </div>
@@ -233,7 +247,7 @@ window.LearningEngine = (function() {
                     <div class="mt-5 pt-4 border-t border-slate-200/80">
                         <div class="flex justify-between items-center mb-1.5">
                             <span class="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
-                                <i class="fa-solid fa-chart-line text-blue-600"></i> 전체 코스 달성률
+                                📈 전체 코스 달성률
                             </span>
                             <span class="text-xs font-extrabold text-blue-600">
                                 ${completedStepsCount} / ${totalSteps} 단계 (${totalPct}%)
@@ -245,7 +259,26 @@ window.LearningEngine = (function() {
                     </div>
                 </div>
 
-                <!-- 6대 단원 커리큘럼 벤토 그리드 -->
+                <!-- 로그아웃 확인 커스텀 모달 팝업 -->
+                <div id="learning-logout-modal" class="learning-custom-modal-overlay" style="display:none;" onclick="LearningEngine.closeLogoutModal(event)">
+                    <div class="learning-custom-modal-content" onclick="event.stopPropagation()">
+                        <div class="modal-emoji-badge">🚪</div>
+                        <h3 class="text-base font-extrabold text-slate-900 mt-2">학습을 종료하고 로그아웃할까요?</h3>
+                        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                            현재까지 완료한 학습 진도와 오답노트는 안전하게 저장되었습니다.<br>언제든 다시 로그인하여 이어서 공부하실 수 있습니다.
+                        </p>
+                        <div class="flex gap-2.5 justify-center mt-5">
+                            <button class="btn-custom-modal-cancel" onclick="LearningEngine.closeLogoutModal()">
+                                계속 공부하기
+                            </button>
+                            <button class="btn-custom-modal-danger" onclick="LearningEngine.confirmLogout()">
+                                로그아웃
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7대 단원 커리큘럼 벤토 그리드 -->
                 <div class="mt-6">
                     <div class="flex items-center justify-between mb-3.5">
                         <h3 class="text-base font-extrabold text-slate-800 flex items-center gap-2">
@@ -693,7 +726,9 @@ window.LearningEngine = (function() {
         switchAuthTab,
         submitLogin,
         submitRegister,
-        logout,
+        showLogoutModal,
+        closeLogoutModal,
+        confirmLogout,
         renderDashboard,
         openSection,
         selectOption,
