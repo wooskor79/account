@@ -548,6 +548,9 @@ window.LearningEngine = (function() {
         const section = curriculum.sections.find(s => s.id === sectionId);
         if (!section) return;
 
+        const prog = (window.LearningAuth && window.LearningAuth.getProgress) ? window.LearningAuth.getProgress() || {} : {};
+        const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
+
         function getSectionTargets(sId) {
             if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8, desc: '필기 8문제, 분개 8문제를 완료하면 단원 마스터가 완료됩니다. (집중 심화 훈련)' };
             if (sId === 'sec_closing') return { reqT: 8, reqJ: 10, desc: '필기 8문제, 분개 10문제를 완료하면 결산 마스터가 완료됩니다. (수동/자동결산 집중 훈련)' };
