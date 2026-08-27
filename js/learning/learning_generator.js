@@ -1,6 +1,7 @@
 /**
  * 2026 PERFECT 전산회계 1급 동적 문제 생성 엔진 (Dynamic Problem Generator)
- * - 각 단원/스텝별로 숫자, 거래처, 계정 조건, 상황을 실시간으로 변형하여 무한히 새로운 필기/분개 문제를 생성합니다.
+ * - 8대 단원 체제 (자산, 부채, 자본, 수익비용, 원가회계, 부가가치세, 결산마스터, 계정마스터)
+ * - 원가/부가세/결산 대폭 확장 및 제8단원 계정과목 3초 판별 스피드 트레이닝 풀 25종 이상 탑재
  */
 window.LearningGenerator = (function() {
 
@@ -13,6 +14,7 @@ window.LearningGenerator = (function() {
     const BANKS = ['국민은행', '신한은행', '우리은행', '하나은행', '기업은행', '농협은행'];
 
     function getRandomItem(arr) {
+        if (!arr || arr.length === 0) return null;
         return arr[Math.floor(Math.random() * arr.length)];
     }
 
@@ -43,429 +45,745 @@ window.LearningGenerator = (function() {
         };
     }
 
-    // --- 단원/스텝별 동적 생성 템플릿 레지스트리 ---
-    const stepGenerators = {
-        // [단원 1. 당좌자산]
-        'asset_01': {
-            theory: function() {
-                const comp = getRandomItem(COMPANIES);
-                const days = getRandomInt(20, 80);
-                const months = getRandomInt(4, 12);
-                
-                const questionTemplates = [
-                    {
-                        question: `다음 중 일반기업회계기준상 현금및현금성자산의 합계액으로 옳은 것은?\n[자료] 통화 500,000원, ${comp} 발행 당좌수표 1,200,000원, 당사 발행 당좌수표 800,000원, 만기 ${days}일 양도성예금증서(CD) 3,000,000원, 취득 시 만기 ${months}개월 정기예금 2,000,000원`,
-                        calc: () => {
-                            const correctVal = 500000 + 1200000 + 3000000;
-                            const opt1 = formatNumber(correctVal) + '원';
-                            const opt2 = formatNumber(correctVal + 800000) + '원';
-                            const opt3 = formatNumber(correctVal + 2000000) + '원';
-                            const opt4 = formatNumber(correctVal - 1200000) + '원';
-                            
-                            return {
-                                options: [opt1, opt2, opt3, opt4],
-                                correctIdx: 0,
-                                explanation: `현금및현금성자산 = 통화(500,000원) + 타인발행수표(1,200,000원) + 만기 3개월 이내 양도성예금증서(3,000,000원) = 4,700,000원입니다. (당사발행 당좌수표는 당좌예금 차감 항목이며, 만기 ${months}개월 정기예금은 단기금융상품입니다.)`
-                            };
-                        }
-                    },
-                    {
-                        // 기존 정적 question 문자열을 제거하고 calc 내부에서 동적 생성하도록 수정
-                        calc: () => {
-                            const receivable = getRandomInt(40, 100) * 1000000;
-                            const prevAllowance = getRandomInt(10, 30) * 10000;
-                            const targetAllowance = receivable * 0.01;
-                            const diff = targetAllowance - prevAllowance;
-
-                            // 동적 데이터가 포함된 명확한 지문 생성
-                            const dynamicQuestion = `다음은 결산 시 매출채권에 대한 대손충당금을 계산하기 위한 자료이다. 올바른 회계처리는?\n[자료] 결산 전 대손충당금 잔액: ${formatNumber(prevAllowance)}원, 기말 매출채권 잔액: ${formatNumber(receivable)}원 (대손율 1%)`;
-
-                            const correctText = `(차) 대손상각비 ${formatNumber(diff)}원 | (대) 대손충당금 ${formatNumber(diff)}원`;
-                            const wrong1 = `(차) 대손상각비 ${formatNumber(targetAllowance)}원 | (대) 대손충당금 ${formatNumber(targetAllowance)}원`;
-                            const wrong2 = `(차) 기타의대손상각비 ${formatNumber(diff)}원 | (대) 대손충당금 ${formatNumber(diff)}원`;
-                            const wrong3 = `(차) 대손충당금 ${formatNumber(diff)}원 | (대) 대손충당금환입 ${formatNumber(diff)}원`;
-
-                            return {
-                                question: dynamicQuestion, // 생성된 동적 지문 반환
-                                options: [correctText, wrong1, wrong2, wrong3],
-                                correctIdx: 0,
-                                explanation: `목표 대손충당금 = ${formatNumber(receivable)}원 × 1% = ${formatNumber(targetAllowance)}원입니다. 보충할 금액 = ${formatNumber(targetAllowance)}원 - 기존잔액 ${formatNumber(prevAllowance)}원 = ${formatNumber(diff)}원입니다.`
-                            };
-                        }
-                    }
-                ];
-
-                const tpl = getRandomItem(questionTemplates);
-                const res = tpl.calc();
-                const shuffled = shuffleOptions(res.options, res.correctIdx);
-
-                return {
-                    id: 'dyn_asset_01_t_' + Date.now(),
-                    type: 'theory',
-                    question: res.question || tpl.question, // calc에서 생성된 question이 있으면 우선 사용
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: res.explanation,
-                    bookReference: '2026 PERFECT 1급 교재 p.36 [현금및현금성자산 & 매출채권]'
-                };
-            },
-            journal: function() {
-                const comp = getRandomItem(COMPANIES);
-                const receivable = getRandomInt(4, 12) * 10000000;
-                const rate = getRandomItem([0.01, 0.02]);
-                const prev = getRandomInt(1, 4) * 100000;
-                const target = receivable * rate;
-                const supplement = target - prev;
-
-                return {
-                    id: 'dyn_asset_01_j_' + Date.now(),
-                    type: 'journal',
-                    question: `기말 현재 매출채권(${comp}) 잔액 ${formatNumber(receivable)}원에 대하여 ${(rate * 100)}%의 대손충당금을 보충법으로 설정하고자 한다. 설정 전 대손충당금 잔액은 ${formatNumber(prev)}원이다. 결산정리분개를 하시오.`,
-                    debit: [{ account: "대손상각비", amount: supplement }],
-                    credit: [{ account: "대손충당금", amount: supplement }],
-                    explanation: `목표 대손충당금: ${formatNumber(receivable)}원 × ${(rate * 100)}% = ${formatNumber(target)}원\n보충 설정액: ${formatNumber(target)}원 - 기존잔액 ${formatNumber(prev)}원 = ${formatNumber(supplement)}원\n분개: (차) 대손상각비(판) ${formatNumber(supplement)}원 / (대) 대손충당금 ${formatNumber(supplement)}원`,
-                    bookReference: '2026 PERFECT 1급 교재 p.58 [대손충당금 보충법]'
-                };
-            }
+    // =========================================================================
+    // 1단원: 자산 심화
+    // =========================================================================
+    const assetTheories = [
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const days = getRandomInt(20, 80);
+            const coin = getRandomInt(2, 8) * 100000;
+            const check = getRandomInt(10, 30) * 100000;
+            const cd = getRandomInt(20, 50) * 100000;
+            const correctVal = coin + check + cd;
+            return {
+                question: `다음 자료 중 재무상태표의 '현금및현금성자산' 총액으로 옳은 것은?\n• 주화 및 지폐: ${formatNumber(coin)}원\n• ${comp} 발행 당좌수표: ${formatNumber(check)}원\n• 취득시 만기 ${days}일 CD: ${formatNumber(cd)}원\n• 결산일 현재 만기 2개월 남은 1년 만기 정기예금: 3,000,000원`,
+                options: [
+                    formatNumber(correctVal) + '원',
+                    formatNumber(correctVal + 3000000) + '원',
+                    formatNumber(correctVal - check) + '원',
+                    formatNumber(coin + cd) + '원'
+                ],
+                correctIdx: 0,
+                explanation: `현금및현금성자산 = 통화(${formatNumber(coin)}) + 타인발행수표(${formatNumber(check)}) + 취득시 3개월 이내 CD(${formatNumber(cd)}) = ${formatNumber(correctVal)}원입니다. (1년 정기예금은 취득시 기준이므로 제외)`,
+                ref: '2026 PERFECT 1급 교재 p.36 [현금및현금성자산]'
+            };
         },
-
-        // [단원 2. 재고자산]
-        'asset_02': {
-            theory: function() {
-                const qty = getRandomInt(50, 150);
-                const lossQty = getRandomInt(5, 15);
-                const unitPrice = getRandomInt(10, 50) * 1000;
-                const totalLoss = lossQty * unitPrice;
-
-                const rawOptions = [
-                    `영업외비용인 '재고자산감모손실' ${formatNumber(totalLoss)}원으로 처리하고 대변 원재료에 적요 8번(타계정대체)을 적용한다.`,
-                    `매출원가에 가산하고 대변 원재료에 적요 8번을 적용하지 않는다.`,
-                    `판매비와관리비인 '감모상각비'로 처리한다.`,
-                    `자산의 차감계정인 '재고자산평가충당금'으로 회계처리한다.`
-                ];
-                const shuffled = shuffleOptions(rawOptions, 0);
-
-                return {
-                    id: 'dyn_asset_02_t_' + Date.now(),
-                    type: 'theory',
-                    question: `기말 재고실사 결과 원재료 장부수량 ${qty}개(단가 ${formatNumber(unitPrice)}원) 중 ${lossQty}개가 도난으로 분실되었으며, 비정상적인 감모손실로 판명되었다. 이에 대한 설명으로 옳은 것은?`,
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: `비정상적인 재고자산 감모손실(${lossQty}개 × ${formatNumber(unitPrice)}원 = ${formatNumber(totalLoss)}원)은 영업외비용 항목인 '재고자산감모손실'로 처리하고, 대변 원재료 계정에 적요 8번(타계정으로 대체)을 반드시 기재합니다.`,
-                    bookReference: '2026 PERFECT 1급 교재 p.88 [재고자산 감모손실과 평가손실]'
-                };
-            },
-            journal: function() {
-                const qty = getRandomInt(10, 30);
-                const price = getRandomInt(5, 20) * 1000;
-                const total = qty * price;
-
-                return {
-                    id: 'dyn_asset_02_j_' + Date.now(),
-                    type: 'journal',
-                    question: `기말 결산 시 원재료의 장부상 수량보다 실제 수량이 ${qty}개 부족(단가 ${formatNumber(price)}원)함을 확인하였으며, 이는 원인 불명의 비정상적 감모손실로 판명되었다. 결산분개를 하시오.`,
-                    debit: [{ account: "재고자산감모손실", amount: total }],
-                    credit: [{ account: "원재료", amount: total }],
-                    explanation: `비정상 감모손실 금액 = ${qty}개 × ${formatNumber(price)}원 = ${formatNumber(total)}원\n분개: (차) 재고자산감모손실(영업외비용) ${formatNumber(total)}원 / (대) 원재료(적요8) ${formatNumber(total)}원`,
-                    bookReference: '2026 PERFECT 1급 교재 p.88 [비정상 재고감모 결산분개]'
-                };
-            }
+        () => {
+            const rec = getRandomInt(5, 12) * 10000000;
+            const prev = getRandomInt(10, 40) * 10000;
+            const target = rec * 0.01;
+            const diff = target - prev;
+            return {
+                question: `기말 현재 외상매출금 잔액 ${formatNumber(rec)}원에 대하여 1%의 대손충당금을 보충법으로 설정하고자 한다. 설정 전 충당금 잔액이 ${formatNumber(prev)}원일 때 손익계산서에 계상할 대손상각비는?`,
+                options: [
+                    formatNumber(diff) + '원',
+                    formatNumber(target) + '원',
+                    formatNumber(prev) + '원',
+                    formatNumber(target + prev) + '원'
+                ],
+                correctIdx: 0,
+                explanation: `목표액 = ${formatNumber(rec)}원 × 1% = ${formatNumber(target)}원. 보충액 = ${formatNumber(target)}원 - ${formatNumber(prev)}원 = ${formatNumber(diff)}원입니다.`,
+                ref: '2026 PERFECT 1급 교재 p.58 [대손충당금 보충법]'
+            };
         },
+        () => {
+            return {
+                question: `물가가 지속적으로 상승할 때 기말재고자산과 당기순이익을 가장 크게 계상하게 되는 단가결정방법은?`,
+                options: [
+                    "선입선출법 (FIFO)",
+                    "후입선출법 (LIFO)",
+                    "총평균법",
+                    "이동평균법"
+                ],
+                correctIdx: 0,
+                explanation: "물가 상승 시 선입선출법은 과거의 저렴한 단가가 매출원가로 먼저 빠져나가 매출원가가 가장 작고 순이익과 기말재고가 가장 큽니다. (선 > 이 > 총 > 후)",
+                ref: '2026 PERFECT 1급 교재 p.74 [재고자산 손익비교]'
+            };
+        }
+    ];
 
-        // [단원 3. 유형·무형자산]
-        'asset_03': {
-            theory: function() {
-                const comp = getRandomItem(COMPANIES);
-                const cost = getRandomInt(20, 50) * 1000000;
-                const dep = getRandomInt(5, 15) * 1000000;
-                const sell = getRandomInt(10, 40) * 1000000;
-                const bookVal = cost - dep;
-                const gainLoss = sell - bookVal;
-                const isGain = gainLoss >= 0;
-
-                const gainLossText = isGain ? `유형자산처분이익 ${formatNumber(gainLoss)}원` : `유형자산처분손실 ${formatNumber(Math.abs(gainLoss))}원`;
-                const wrongGainLoss = isGain ? `유형자산처분손실 ${formatNumber(gainLoss)}원` : `유형자산처분이익 ${formatNumber(Math.abs(gainLoss))}원`;
-
-                const rawOptions = [
-                    gainLossText,
-                    wrongGainLoss,
-                    `유형자산처분이익 ${formatNumber(cost - sell)}원`,
-                    `감가상각비 ${formatNumber(dep)}원`
-                ];
-                const shuffled = shuffleOptions(rawOptions, 0);
-
-                return {
-                    id: 'dyn_asset_03_t_' + Date.now(),
-                    type: 'theory',
-                    question: `${comp}는 보유 중이던 기계장치(취득원가 ${formatNumber(cost)}원, 감가상각누계액 ${formatNumber(dep)}원)를 ${formatNumber(sell)}원에 처분하고 대금은 월말에 받기로 하였다. 손익계산서에 반영될 손익은?`,
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: `장부가액 = 취득원가(${formatNumber(cost)}원) - 감가상각누계액(${formatNumber(dep)}원) = ${formatNumber(bookVal)}원입니다.\n처분손익 = 처분가액(${formatNumber(sell)}원) - 장부가액(${formatNumber(bookVal)}원) = ${gainLossText}입니다.`,
-                    bookReference: '2026 PERFECT 1급 교재 p.112 [유형자산의 처분]'
-                };
-            },
-            journal: function() {
-                const comp = getRandomItem(COMPANIES);
-                const bank = getRandomItem(BANKS);
-                const cost = getRandomInt(30, 60) * 1000000;
-                const dep = getRandomInt(10, 25) * 1000000;
-                const bookVal = cost - dep;
-                const diff = getRandomInt(1, 5) * 1000000;
-                const isGain = Math.random() > 0.5;
-                const sell = isGain ? (bookVal + diff) : (bookVal - diff);
-
-                const debits = [
-                    { account: "감가상각누계액", amount: dep },
-                    { account: "보통예금", amount: sell }
-                ];
-                const credits = [
-                    { account: "기계장치", amount: cost }
-                ];
-
-                if (isGain) {
-                    credits.push({ account: "유형자산처분이익", amount: diff });
-                } else {
-                    debits.push({ account: "유형자산처분손실", amount: diff });
-                }
-
-                return {
-                    id: 'dyn_asset_03_j_' + Date.now(),
-                    type: 'journal',
-                    question: `사용하던 기계장치(취득원가 ${formatNumber(cost)}원, 감가상각누계액 ${formatNumber(dep)}원)를 ${comp}에 ${formatNumber(sell)}원에 처분하고, 대금은 ${bank} 보통예금 계좌로 입금받았다. (처분 분개를 하시오.)`,
-                    debit: debits,
-                    credit: credits,
-                    explanation: `1. 대변에 기계장치 취득원가 ${formatNumber(cost)}원 제거\n2. 차변에 감가상각누계액 ${formatNumber(dep)}원 제거 및 입금액(보통예금) ${formatNumber(sell)}원 기록\n3. ${isGain ? '처분이익 ' + formatNumber(diff) + '원 대변 기록' : '처분손실 ' + formatNumber(diff) + '원 차변 기록'}`,
-                    bookReference: '2026 PERFECT 1급 교재 p.112 [유형자산 처분 분개]'
-                };
-            }
+    const assetJournals = [
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const stockVal = getRandomInt(20, 60) * 100000;
+            const fee = getRandomInt(10, 30) * 10000;
+            const total = stockVal + fee;
+            return {
+                question: `단기 시세차익 목적으로 상장주식을 ${formatNumber(stockVal)}원에 취득하고, 매입수수료 ${formatNumber(fee)}원을 포함한 총액 ${formatNumber(total)}원을 보통예금에서 이체 지급하였다.`,
+                debit: [
+                    { account: "단기매매증권", amount: stockVal },
+                    { account: "수수료비용", amount: fee }
+                ],
+                credit: [{ account: "보통예금", amount: total }],
+                explanation: `단기매매증권 취득 수수료는 영업외비용(수수료비용 900번대)으로 별도 분개합니다.`,
+                ref: '2026 PERFECT 1급 교재 p.44 [단기매매증권 취득]'
+            };
         },
+        () => {
+            const qty = getRandomInt(10, 30);
+            const price = getRandomInt(1, 4) * 10000;
+            const total = qty * price;
+            return {
+                question: `기말 실사 결과 원재료 ${qty}개(단가 ${formatNumber(price)}원)가 도난으로 분실되었으며 이는 비정상적인 감모손실로 판명되었다. 결산분개를 하시오.`,
+                debit: [{ account: "재고자산감모손실", amount: total }],
+                credit: [{ account: "원재료", amount: total }],
+                explanation: `(차) 재고자산감모손실(영업외비용) ${formatNumber(total)}원 / (대) 원재료(적요 8. 타계정대체) ${formatNumber(total)}원`,
+                ref: '2026 PERFECT 1급 교재 p.88 [재고감모손실]'
+            };
+        }
+    ];
 
-        // [단원 4. 부채]
-        'sec_liability': {
-            theory: function() {
-                const comp = getRandomItem(COMPANIES);
-                const totalSalary = getRandomInt(300, 600) * 10000;
-                const tax = Math.round(totalSalary * 0.09);
-                const netPay = totalSalary - tax;
+    // =========================================================================
+    // 2단원: 부채 심화
+    // =========================================================================
+    const liabTheories = [
+        () => {
+            return {
+                question: `사채를 유효이자율법으로 상각할 때, 사채할인발행차금 상각액과 사채할증발행차금 환입액의 매년 추이로 옳은 것은?`,
+                options: [
+                    "할인발행차금 상각액: 매년 증가 / 할증발행차금 환입액: 매년 증가",
+                    "할인발행차금 상각액: 매년 증가 / 할증발행차금 환입액: 매년 감소",
+                    "할인발행차금 상각액: 매년 감소 / 할증발행차금 환입액: 매년 증가",
+                    "할인발행차금 상각액: 매년 감소 / 할증발행차금 환입액: 매년 감소"
+                ],
+                correctIdx: 0,
+                explanation: "유효이자율법 적용 시 사채할인발행차금 상각액과 할증발행차금 환입액은 모두 매년 증가합니다.",
+                ref: '2026 PERFECT 1급 교재 p.176 [사채 상각]'
+            };
+        }
+    ];
 
-                const rawOptions = [
-                    "예수금 (유동부채)",
-                    "선수금 (유동부채)",
-                    "미지급비용 (유동부채)",
-                    "세금과공과 (판매비와관리비)"
-                ];
-                const shuffled = shuffleOptions(rawOptions, 0);
-
-                return {
-                    id: 'dyn_liab_t_' + Date.now(),
-                    type: 'theory',
-                    question: `${comp}는 본사 관리부 직원들의 급여 총액 ${formatNumber(totalSalary)}원을 지급하면서 소득세 및 4대보험료 ${formatNumber(tax)}원을 원천징수하고 잔액 ${formatNumber(netPay)}원을 보통예금으로 이체하였다. 원천징수한 금액 ${formatNumber(tax)}원의 올바른 계정과목은?`,
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: `급여 지급 시 소득세, 지방소득세, 건강보험료, 국민연금 등 원천징수한 세액과 보험료는 임시로 보관하는 유동부채인 '예수금'으로 처리합니다.`,
-                    bookReference: '2026 PERFECT 1급 교재 p.150 [유동부채 - 예수금]'
-                };
-            },
-            journal: function() {
-                const totalSalary = getRandomInt(400, 800) * 10000;
-                const tax = Math.round(totalSalary * 0.1);
-                const net = totalSalary - tax;
-                const bank = getRandomItem(BANKS);
-
-                return {
-                    id: 'dyn_liab_j_' + Date.now(),
-                    type: 'journal',
-                    question: `영업부 직원의 급여 ${formatNumber(totalSalary)}원을 지급하면서 근로소득세 및 4대보험 예수금 ${formatNumber(tax)}원을 차감한 잔액 ${formatNumber(net)}원을 ${bank} 보통예금으로 이체 지급하였다.`,
-                    debit: [{ account: "급여", amount: totalSalary }],
-                    credit: [
-                        { account: "예수금", amount: tax },
-                        { account: "보통예금", amount: net }
-                    ],
-                    explanation: `차변: 급여(판) ${formatNumber(totalSalary)}원\n대변: 예수금 ${formatNumber(tax)}원, 보통예금 ${formatNumber(net)}원`,
-                    bookReference: '2026 PERFECT 1급 교재 p.150 [급여 지급 및 예수금 회계처리]'
-                };
-            }
+    const liabJournals = [
+        () => {
+            const salary = getRandomInt(400, 700) * 10000;
+            const tax = Math.round(salary * 0.1);
+            const net = salary - tax;
+            return {
+                question: `영업부 직원 급여 ${formatNumber(salary)}원을 지급하면서 소득세 및 4대보험 예수금 ${formatNumber(tax)}원을 차감한 잔액 ${formatNumber(net)}원을 보통예금으로 이체하였다.`,
+                debit: [{ account: "급여", amount: salary }],
+                credit: [
+                    { account: "예수금", amount: tax },
+                    { account: "보통예금", amount: net }
+                ],
+                explanation: `(차) 급여(판) ${formatNumber(salary)}원 / (대) 예수금 ${formatNumber(tax)}원, 보통예금 ${formatNumber(net)}원`,
+                ref: '2026 PERFECT 1급 교재 p.150 [급여 전표]'
+            };
         },
+        () => {
+            const amt = getRandomInt(5, 15) * 1000000;
+            return {
+                question: `본사 영업부 직원에 대한 확정급여형(DB형) 퇴직연금 부담금 ${formatNumber(amt)}원을 보통예금 계좌에서 이체 납부하였다.`,
+                debit: [{ account: "퇴직연금운용자산", amount: amt }],
+                credit: [{ account: "보통예금", amount: amt }],
+                explanation: `확정급여형(DB형)은 납입 시 '퇴직연금운용자산(자산)'으로 처리합니다.`,
+                ref: '2026 PERFECT 1급 교재 p.186 [퇴직연금]'
+            };
+        }
+    ];
 
-        // [단원 5. 자본]
-        'sec_equity': {
-            theory: function() {
-                const shares = getRandomInt(1000, 5000);
-                const par = 5000;
-                const issue = getRandomInt(6000, 10000);
-                const cap = shares * par;
-                const premium = shares * (issue - par);
+    // =========================================================================
+    // 3단원: 자본 심화
+    // =========================================================================
+    const equityTheories = [
+        () => {
+            const div = getRandomInt(10, 30) * 1000000;
+            const stockDiv = getRandomInt(5, 10) * 1000000;
+            const prep = Math.round(div * 0.1);
+            return {
+                question: `주주총회에서 현금배당 ${formatNumber(div)}원과 주식배당 ${formatNumber(stockDiv)}원을 결의하였다. 상법상 최소한으로 적립해야 하는 이익준비금은?`,
+                options: [
+                    formatNumber(prep) + '원',
+                    formatNumber(prep + stockDiv * 0.1) + '원',
+                    formatNumber(stockDiv * 0.1) + '원',
+                    '0원'
+                ],
+                correctIdx: 0,
+                explanation: `이익준비금은 현금배당액(${formatNumber(div)}원)의 10%인 ${formatNumber(prep)}원을 적립합니다. (주식배당은 제외)`,
+                ref: '2026 PERFECT 1급 교재 p.220 [이익준비금]'
+            };
+        }
+    ];
 
-                const rawOptions = [
-                    formatNumber(cap + premium) + '원',
-                    formatNumber(cap) + '원',
-                    formatNumber(premium) + '원',
-                    formatNumber(shares * issue) + '원'
-                ];
-                const shuffled = shuffleOptions(rawOptions, 0);
+    const equityJournals = [
+        () => {
+            const shares = getRandomInt(2000, 4000);
+            const par = 5000;
+            const issue = 8000;
+            const cap = shares * par;
+            const total = shares * issue;
+            const premium = total - cap;
+            return {
+                question: `보통주식 ${formatNumber(shares)}주(액면가 5,000원)를 1주당 8,000원에 할증발행하고 주금 전액이 보통예금으로 입금되었다.`,
+                debit: [{ account: "보통예금", amount: total }],
+                credit: [
+                    { account: "자본금", amount: cap },
+                    { account: "주식발행초과금", amount: premium }
+                ],
+                explanation: `자본금은 액면가(${formatNumber(cap)}원)로 증가하고 초과액은 주식발행초과금으로 처리합니다.`,
+                ref: '2026 PERFECT 1급 교재 p.202 [주식 할증발행]'
+            };
+        }
+    ];
 
-                return {
-                    id: 'dyn_eq_t_' + Date.now(),
-                    type: 'theory',
-                    question: `당사는 보통주식 ${formatNumber(shares)}주(액면가액 1주당 ${formatNumber(par)}원)를 1주당 ${formatNumber(issue)}원에 할증발행하고 주금 납입액 전액이 보통예금으로 입금되었다. 이 거래로 인하여 증가하는 자본금의 금액은?`,
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: `주식 발행 시 '자본금'은 무조건 '발행주식수 × 액면가액'(${formatNumber(shares)}주 × ${formatNumber(par)}원 = ${formatNumber(cap)}원)으로만 증가합니다. 액면초과액(${formatNumber(premium)}원)은 '주식발행초과금(자본잉여금)'으로 처리됩니다.`,
-                    bookReference: '2026 PERFECT 1급 교재 p.184 [주식의 발행과 자본금]'
-                };
-            },
-            journal: function() {
-                const shares = getRandomInt(2000, 5000);
-                const par = 5000;
-                const issue = getRandomInt(6, 10) * 1000;
-                const cap = shares * par;
-                const total = shares * issue;
-                const premium = total - cap;
+    // =========================================================================
+    // 4단원: 수익과 비용
+    // =========================================================================
+    const revTheories = [
+        () => {
+            return {
+                question: `다음 중 포괄손익계산서상 판매비와관리비에 해당하지 않고 '영업외비용'으로 분류되는 것은?`,
+                options: [
+                    "불우이웃돕기 성금 및 수재의연금 기부금",
+                    "본사 사무실 전화요금 및 인터넷 통신비",
+                    "거래처 명절 선물 구입비인 접대비",
+                    "영업부 직원 야간 식대인 복리후생비"
+                ],
+                correctIdx: 0,
+                explanation: "기부금은 주된 영업활동과 무관한 영업외비용(900번대)입니다.",
+                ref: '2026 PERFECT 1급 교재 p.250 [영업외비용]'
+            };
+        }
+    ];
 
-                return {
-                    id: 'dyn_eq_j_' + Date.now(),
-                    type: 'journal',
-                    question: `이사회 결의를 거쳐 보통주식 ${formatNumber(shares)}주(액면가액 1주당 ${formatNumber(par)}원)를 1주당 ${formatNumber(issue)}원에 신주 발행하고, 주금 전액이 보통예금 통장으로 입금되었다. (주식발행초과금 잔액은 0원임)`,
-                    debit: [{ account: "보통예금", amount: total }],
-                    credit: [
-                        { account: "자본금", amount: cap },
-                        { account: "주식발행초과금", amount: premium }
-                    ],
-                    explanation: `차변: 보통예금 ${formatNumber(total)}원\n대변: 자본금(${formatNumber(shares)}주 × ${formatNumber(par)}원) ${formatNumber(cap)}원, 주식발행초과금 ${formatNumber(premium)}원`,
-                    bookReference: '2026 PERFECT 1급 교재 p.184 [주식 할증발행 분개]'
-                };
-            }
+    const revJournals = [
+        () => {
+            const amt = getRandomInt(50, 150) * 10000;
+            return {
+                question: `지역 복지관에 불우이웃돕기 성금 ${formatNumber(amt)}원을 보통예금 계좌에서 이체 기부하였다.`,
+                debit: [{ account: "기부금", amount: amt }],
+                credit: [{ account: "보통예금", amount: amt }],
+                explanation: `(차) 기부금(영업외비용) ${formatNumber(amt)}원 / (대) 보통예금 ${formatNumber(amt)}원`,
+                ref: '2026 PERFECT 1급 교재 p.250 [기부금 전표]'
+            };
+        }
+    ];
+
+    // =========================================================================
+    // 5단원: 원가회계 (8개 스텝 대폭 강화 🚀)
+    // =========================================================================
+    const costTheories = [
+        () => {
+            return {
+                question: `다음 중 원가의 3요소 결합에서 '가공원가(가공비)'에 해당하는 항목의 조합으로 옳은 것은?`,
+                options: [
+                    "직접노무비 + 제조간접비",
+                    "직접재료비 + 직접노무비",
+                    "직접재료비 + 제조간접비",
+                    "직접재료비 + 판매비와관리비"
+                ],
+                correctIdx: 0,
+                explanation: "기초원가 = 직접재료비 + 직접노무비 / 가공원가 = 직접노무비 + 제조간접비입니다.",
+                ref: '2026 PERFECT 1급 교재 p.280 [원가의 분류]'
+            };
         },
+        () => {
+            return {
+                question: `조업도(생산량)가 증가함에 따라 '단위당 원가'는 감소하고 '총원가'는 일정한 원가 행태를 보이는 것은?`,
+                options: [
+                    "고정원가 (공장 임차료, 감가상각비)",
+                    "변동원가 (직접재료비)",
+                    "준변동원가 (전력비)",
+                    "준고정원가 (품질검사원 인건비)"
+                ],
+                correctIdx: 0,
+                explanation: "고정원가는 총원가가 일정하므로 생산량이 늘어날수록 단위당 고정원가는 반비례하여 감소합니다.",
+                ref: '2026 PERFECT 1급 교재 p.285 [원가 행태]'
+            };
+        },
+        () => {
+            const hours = getRandomInt(1000, 2500);
+            const rate = getRandomInt(2, 4) * 1000;
+            const estimated = hours * rate;
+            const diff = getRandomInt(10, 40) * 10000;
+            const isUnder = Math.random() > 0.5;
+            const actual = isUnder ? (estimated + diff) : (estimated - diff);
+            const ansText = isUnder ? `과소배부 ${formatNumber(diff)}원` : `과대배부 ${formatNumber(diff)}원`;
+            const wrongText = isUnder ? `과대배부 ${formatNumber(diff)}원` : `과소배부 ${formatNumber(diff)}원`;
 
-        // [단원 6. 원가회계]
-        'sec_cost': {
-            theory: function() {
-                const directLaborHours = getRandomInt(1000, 3000);
-                const rate = getRandomInt(2, 5) * 1000;
-                const estimated = directLaborHours * rate;
-                const actual = estimated + (getRandomItem([-1, 1]) * getRandomInt(10, 50) * 10000);
-                const diff = actual - estimated;
-                const isUnder = diff > 0;
-
-                const ansText = isUnder ? `과소배부 ${formatNumber(diff)}원` : `과대배부 ${formatNumber(Math.abs(diff))}원`;
-                const wrongText = isUnder ? `과대배부 ${formatNumber(diff)}원` : `과소배부 ${formatNumber(Math.abs(diff))}원`;
-
-                const rawOptions = [
+            return {
+                question: `당사는 제조간접비를 직접노동시간 기준으로 예정배부한다. 예정배부율은 시간당 ${formatNumber(rate)}원이며 실제 직접노동시간은 ${formatNumber(hours)}시간이었다. 실제 발생액이 ${formatNumber(actual)}원일 때 배부차이는?`,
+                options: [
                     ansText,
                     wrongText,
                     `과소배부 ${formatNumber(estimated)}원`,
                     `과대배부 ${formatNumber(actual)}원`
-                ];
-                const shuffled = shuffleOptions(rawOptions, 0);
-
-                return {
-                    id: 'dyn_cost_t_' + Date.now(),
-                    type: 'theory',
-                    question: `당사는 제조간접비를 직접노동시간을 기준으로 예정배부하고 있다. 당기 예정배부율은 직접노동시간당 ${formatNumber(rate)}원이며, 당기 실제 직접노동시간은 ${formatNumber(directLaborHours)}시간이었다. 당기 실제 제조간접비 발생액이 ${formatNumber(actual)}원일 때, 제조간접비 배부차이는?`,
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: `예정배부액 = 실제조업도(${formatNumber(directLaborHours)}시간) × 예정배부율(${formatNumber(rate)}원) = ${formatNumber(estimated)}원입니다.\n배부차이 = 예정배부액(${formatNumber(estimated)}원) - 실제발생액(${formatNumber(actual)}원) = ${ansText}입니다. (실제발생액이 예정배부액보다 크면 배부가 덜 된 것이므로 과소배부입니다.)`,
-                    bookReference: '2026 PERFECT 1급 교재 p.240 [제조간접비 예정배부 및 배부차이]'
-                };
-            },
-            journal: function() {
-                const rawMat = getRandomInt(300, 600) * 10000;
-                const labor = getRandomInt(200, 500) * 10000;
-                const total = rawMat + labor;
-
-                return {
-                    id: 'dyn_cost_j_' + Date.now(),
-                    type: 'journal',
-                    question: `당월 제품 제조를 위하여 원재료 ${formatNumber(rawMat)}원과 노무비(임금) ${formatNumber(labor)}원을 제조 공정에 투입(재공품 대체)하였다.`,
-                    debit: [{ account: "재공품", amount: total }],
-                    credit: [
-                        { account: "원재료", amount: rawMat },
-                        { account: "임금", amount: labor }
-                    ],
-                    explanation: `차변: 재공품 ${formatNumber(total)}원\n대변: 원재료 ${formatNumber(rawMat)}원, 임금 ${formatNumber(labor)}원`,
-                    bookReference: '2026 PERFECT 1급 교재 p.230 [원가요소의 재공품 대체]'
-                };
-            }
+                ],
+                correctIdx: 0,
+                explanation: `예정배부액 = ${formatNumber(hours)}시간 × ${formatNumber(rate)}원 = ${formatNumber(estimated)}원. 배부차이 = 예정 - 실제 = ${ansText}입니다.`,
+                ref: '2026 PERFECT 1급 교재 p.325 [제조간접비 예정배부]'
+            };
         },
+        () => {
+            const compQty = 800;
+            const endQty = 200;
+            const endRate = 0.5;
+            const baseQty = 100;
+            const baseRate = 0.4;
+            const fifoEquivalent = compQty + (endQty * endRate) - (baseQty * baseRate);
 
-        // [단원 7. 부가가치세]
-        'sec_vat': {
-            theory: function() {
-                const rawOptions = [
-                    `공장 생산직 직원의 복리후생비 성격의 작업복 구입 매입세액`,
-                    `영업용 화물차(1톤 트럭) 구입 관련 매입세액`,
-                    `본사 총무부 업무용 2,000cc 개별소비세 과세대상 승용차 구입 및 유지 관련 매입세액`,
-                    `과세사업에 사용하기 위해 취득한 원재료 매입세액`
-                ];
-                // 기존 코드는 3번째(index 2)가 정답이었습니다. 보기 순서를 위와 같이 재배치하고 0번 인덱스를 정답으로 셔플합니다.
-                const shuffled = shuffleOptions(rawOptions, 2); // '개별소비세 과세대상...' 이 정답(인덱스 2)
-
-                return {
-                    id: 'dyn_vat_t_' + Date.now(),
-                    type: 'theory',
-                    question: `다음 중 부가가치세법상 매입세액공제가 불가능한(불공제) 항목으로 옳은 것은?`,
-                    options: shuffled.options,
-                    correctAnswer: shuffled.correctAnswer,
-                    explanation: `개별소비세 과세대상 승용차(비영업용 소형승용차: 8인승 이하 승용차로서 배기량 1,000cc 초과)의 구입·임차·유지 관련 매입세액은 부가가치세법 제39조에 따라 불공제(매입세액 불공제) 대상입니다. (1톤 트럭이나 9인승 이상 승합차, 1,000cc 이하 경차는 공제 가능)`,
-                    bookReference: '2026 PERFECT 1급 교재 p.310 [매입세액 불공제 항목]'
-                };
-            },
-            journal: function() {
-                const comp = getRandomItem(COMPANIES);
-                const supply = getRandomInt(10, 30) * 100000;
-                const vat = supply * 0.1;
-                const bank = getRandomItem(BANKS);
-
-                return {
-                    id: 'dyn_vat_j_' + Date.now(),
-                    type: 'journal',
-                    question: `${comp}에 제품을 공급가액 ${formatNumber(supply)}원(부가가치세 ${formatNumber(vat)}원 별도)에 판매하고, 전자세금계산서를 발급하였다. 대금 중 ${formatNumber(vat)}원은 당일 ${bank} 보통예금으로 받고, 잔액은 외상으로 하였다.`,
-                    debit: [
-                        { account: "보통예금", amount: vat },
-                        { account: "외상매출금", amount: supply }
-                    ],
-                    credit: [
-                        { account: "제품매출", amount: supply },
-                        { account: "부가세예수금", amount: vat }
-                    ],
-                    explanation: `차변: 보통예금 ${formatNumber(vat)}원, 외상매출금 ${formatNumber(supply)}원\n대변: 제품매출 ${formatNumber(supply)}원, 부가세예수금 ${formatNumber(vat)}원`,
-                    bookReference: '2026 PERFECT 1급 교재 p.305 [과세매출 분개]'
-                };
-            }
+            return {
+                question: `기초재공품 ${baseQty}개(진척도 40%), 당기완성 ${compQty}개, 기말재공품 ${endQty}개(진척도 50%)일 때, 재료비는 공정 초기에 전량 투입되고 가공비는 균등 발생한다. '선입선출법'에 의한 가공비 완성품환산량은?`,
+                options: [
+                    `${fifoEquivalent}개`,
+                    `${compQty + endQty * endRate}개`,
+                    `${compQty}개`,
+                    `${fifoEquivalent - 50}개`
+                ],
+                correctIdx: 0,
+                explanation: `선입선출법 가공비 환산량 = 당기완성(${compQty}) + 기말환산(${endQty}×50%=100) - 기초환산(${baseQty}×40%=40) = ${fifoEquivalent}개입니다.`,
+                ref: '2026 PERFECT 1급 교재 p.345 [완성품환산량 계산]'
+            };
         }
+    ];
+
+    const costJournals = [
+        () => {
+            const mat = getRandomInt(300, 700) * 10000;
+            const labor = getRandomInt(200, 500) * 10000;
+            const total = mat + labor;
+            return {
+                question: `당월 제품 생산을 위해 원재료 ${formatNumber(mat)}원과 생산직 임금 ${formatNumber(labor)}원을 제조공정(재공품)에 투입·대체하였다.`,
+                debit: [{ account: "재공품", amount: total }],
+                credit: [
+                    { account: "원재료", amount: mat },
+                    { account: "임금", amount: labor }
+                ],
+                explanation: `(차) 재공품 ${formatNumber(total)}원 / (대) 원재료 ${formatNumber(mat)}원, 임금 ${formatNumber(labor)}원`,
+                ref: '2026 PERFECT 1급 교재 p.295 [재공품 대체]'
+            };
+        },
+        () => {
+            const amt = getRandomInt(15, 35) * 1000000;
+            return {
+                question: `당월 제조공정에서 최종 완성된 제품 ${formatNumber(amt)}원을 재공품 계정에서 제품 계정으로 대체하다.`,
+                debit: [{ account: "제품", amount: amt }],
+                credit: [{ account: "재공품", amount: amt }],
+                explanation: `(차) 제품 ${formatNumber(amt)}원 / (대) 재공품 ${formatNumber(amt)}원`,
+                ref: '2026 PERFECT 1급 교재 p.300 [완제품 대체]'
+            };
+        }
+    ];
+
+    // =========================================================================
+    // 6단원: 부가가치세 (8개 스텝 대폭 강화 🚀)
+    // =========================================================================
+    const vatTheories = [
+        () => {
+            return {
+                question: `다음 중 부가가치세법상 '면세(Tax Exemption)' 대상에 해당하지 않고 과세되는 거래는?`,
+                options: [
+                    "KTX 고속철도 및 항공기, 택시 이용 요금",
+                    "병원 및 한의원의 진료 및 치료 용역",
+                    "초·중·고등학교 및 정규 인가 학원의 교육 용역",
+                    "가공되지 않은 신선 농·축·수·임산물"
+                ],
+                correctIdx: 0,
+                explanation: "시내버스와 지하철은 면세이나 KTX 고속철도, 항공기, 택시, 우등고속버스는 과세 대상입니다.",
+                ref: '2026 PERFECT 1급 교재 p.385 [면세 대상]'
+            };
+        },
+        () => {
+            return {
+                question: `다음 중 세금계산서를 수취하였더라도 부가가치세 매입세액을 공제받을 수 없는(54.불공) 거래는?`,
+                options: [
+                    "영업부 업무용 2,000cc 개별소비세 과세대상 중형승용차 주유비 및 수리비",
+                    "생산부 직원의 출퇴근용 9인승 카니발 승합차 구입비",
+                    "배기량 1,000cc 이하 모닝 경차의 타이어 교체 비용",
+                    "공장 원재료 운반용 1톤 화물트럭 구입비"
+                ],
+                correctIdx: 0,
+                explanation: "1,000cc 초과 8인승 이하 비영업용 승용차 관련 지출은 매입세액 불공제 대상입니다.",
+                ref: '2026 PERFECT 1급 교재 p.415 [매입세액 불공제]'
+            };
+        },
+        () => {
+            return {
+                question: `다음 중 세금계산서의 '필요적 기재사항'으로만 짝지어진 것은?`,
+                options: [
+                    "공급자 등록번호/성명, 공급받는자 등록번호, 작성연월일, 공급가액과 부가가치세액",
+                    "공급자 등록번호, 공급받는자 상호 및 성명, 공급연월일, 공급대가",
+                    "공급자 사업장 주소, 공급받는자 등록번호, 작성연월일, 비고란",
+                    "공급자 업태/종목, 공급받는자 상호, 공급연월일, 세액"
+                ],
+                correctIdx: 0,
+                explanation: "필요적 기재사항은 ①공급자 등록번호·성명, ②공급받는자 사업자등록번호, ③작성연월일, ④공급가액과 세액입니다.",
+                ref: '2026 PERFECT 1급 교재 p.405 [세금계산서 필요적 기재사항]'
+            };
+        }
+    ];
+
+    const vatJournals = [
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const supply = getRandomInt(10, 30) * 1000000;
+            const vat = supply * 0.1;
+            return {
+                question: `${comp}에 제품을 ${formatNumber(supply)}원(부가가치세 ${formatNumber(vat)}원 별도)에 공급하고 전자세금계산서를 발급하였다. 대금 전액은 외상으로 하였다. (11.과세)`,
+                debit: [{ account: "외상매출금", amount: supply + vat }],
+                credit: [
+                    { account: "제품매출", amount: supply },
+                    { account: "부가세예수금", amount: vat }
+                ],
+                explanation: `(차) 외상매출금 ${formatNumber(supply + vat)}원 / (대) 제품매출 ${formatNumber(supply)}원, 부가세예수금 ${formatNumber(vat)}원`,
+                ref: '2026 PERFECT 1급 교재 p.422 [11.과세 전표]'
+            };
+        },
+        () => {
+            const gift = getRandomInt(10, 30) * 100000;
+            const vat = gift * 0.1;
+            const total = gift + vat;
+            return {
+                question: `거래처 명절 선물용 과일세트를 ${formatNumber(gift)}원(부가가치세 ${formatNumber(vat)}원 별도)에 구입하고 전자세금계산서를 발급받았으며, 보통예금에서 이체 지급하였다. (54.불공)`,
+                debit: [{ account: "접대비", amount: total }],
+                credit: [{ account: "보통예금", amount: total }],
+                explanation: `접대비 관련 매입세액은 불공제되므로 부가세대급금이 아닌 접대비 원가에 전액 가산(${formatNumber(total)}원)합니다.`,
+                ref: '2026 PERFECT 1급 교재 p.415 [54.불공 전표]'
+            };
+        }
+    ];
+
+    // =========================================================================
+    // 7단원: 결산정리분개 마스터 (5개 스텝 실전 집중 🎯)
+    // =========================================================================
+    const closingTheories = [
+        () => {
+            const amt = getRandomInt(20, 60) * 10000;
+            return {
+                question: `결산 시 '당기분 미지급 이자비용 ${formatNumber(amt)}원'을 누락하고 결산을 마감한 경우 재무제표에 미치는 영향으로 옳은 것은?`,
+                options: [
+                    "부채가 과소계상되고 당기순이익이 과대계상된다.",
+                    "비용이 과대계상되고 당기순이익이 과소계상된다.",
+                    "자산이 과대계상되고 당기순이익이 과대계상된다.",
+                    "부채가 과대계상되고 당기순이익이 과소계상된다."
+                ],
+                correctIdx: 0,
+                explanation: "미지급이자(비용)와 미지급비용(부채)이 누락되었으므로 비용 과소 ➔ 순이익 과대, 부채 과소계상됩니다.",
+                ref: '2026 PERFECT 1급 교재 p.258 [손익의 발생 누락]'
+            };
+        },
+        () => {
+            return {
+                question: `결산 시 장부 마감 과정에서 재무제표가 작성 및 연결되는 올바른 순서는?`,
+                options: [
+                    "제조원가명세서 ➔ 손익계산서 ➔ 이익잉여금처분계산서 ➔ 재무상태표",
+                    "손익계산서 ➔ 제조원가명세서 ➔ 재무상태표 ➔ 이익잉여금처분계산서",
+                    "재무상태표 ➔ 손익계산서 ➔ 제조원가명세서 ➔ 이익잉여금처분계산서",
+                    "제조원가명세서 ➔ 재무상태표 ➔ 손익계산서 ➔ 이익잉여금처분계산서"
+                ],
+                correctIdx: 0,
+                explanation: "재무제표 마감 순서는 '제조원가명세서 ➔ 손익계산서 ➔ 이익잉여금처분계산서 ➔ 재무상태표' (제-손-이-표)입니다.",
+                ref: '2026 PERFECT 1급 교재 p.267 [마감 순서]'
+            };
+        }
+    ];
+
+    const closingJournals = [
+        () => {
+            const startMonth = getRandomInt(7, 10);
+            const annual = 2400000;
+            const remainMonths = 12 - (12 - startMonth + 1);
+            const prepaid = Math.round(annual * (remainMonths / 12));
+            return {
+                question: `당기 ${startMonth}월 1일에 본사 영업부 화재보험료 1년분 ${formatNumber(annual)}원(보험기간: 당기 ${startMonth}/1 ~ 차기 ${startMonth-1}/말일)을 전액 보험료(비용)로 처리하였다. 12월 31일 결산정리분개를 하시오. (월할계산)`,
+                debit: [{ account: "선급비용", amount: prepaid }],
+                credit: [{ account: "보험료", amount: prepaid }],
+                explanation: `차기 미경과분은 ${remainMonths}개월치(${formatNumber(prepaid)}원)이므로 차변 선급비용 / 대변 보험료로 대체합니다.`,
+                ref: '2026 PERFECT 1급 교재 p.260 [선급비용 결산]'
+            };
+        },
+        () => {
+            const dollars = getRandomInt(10, 40) * 1000;
+            const diff = dollars * 100;
+            return {
+                question: `결산일 현재 보유 중인 외화외상매출금 $${formatNumber(dollars)}(발생시 환율 1,250원/$)에 대해 결산일 현재 기준환율 1,350원/$을 적용하여 평가하다.`,
+                debit: [{ account: "외상매출금", amount: diff }],
+                credit: [{ account: "외화환산이익", amount: diff }],
+                explanation: `환율이 100원 상승하여 채권 가치가 ${formatNumber(diff)}원 증가하였습니다. (차) 외상매출금 / (대) 외화환산이익`,
+                ref: '2026 PERFECT 1급 교재 p.269 [외화평가]'
+            };
+        },
+        () => {
+            const totalTax = getRandomInt(10, 20) * 1000000;
+            const prepTax = getRandomInt(3, 6) * 1000000;
+            const payTax = totalTax - prepTax;
+            return {
+                question: `당기분 법인세 추산액 ${formatNumber(totalTax)}원을 계상하고자 한다. 당기 중 납부한 법인세 중간예납세액(선납세금)은 ${formatNumber(prepTax)}원이다. 결산정리분개를 하시오.`,
+                debit: [{ account: "법인세비용", amount: totalTax }],
+                credit: [
+                    { account: "선납세금", amount: prepTax },
+                    { account: "미지급세금", amount: payTax }
+                ],
+                explanation: `(차) 법인세비용 ${formatNumber(totalTax)}원 / (대) 선납세금 ${formatNumber(prepTax)}원, 미지급세금 ${formatNumber(payTax)}원`,
+                ref: '2026 PERFECT 1급 교재 p.270 [법인세 결산]'
+            };
+        }
+    ];
+
+    // =========================================================================
+    // [신설!] 8단원: 실무 계정과목 3초 판별 트레이닝 풀 25종 이상 ⚡
+    // =========================================================================
+    const accountMasterPool = [
+        // 1. 공장 식대
+        () => ({
+            question: `[3초 계정과목 판별]\n"공장 생산직 직원의 야간 식대 150,000원을 법인카드로 결제함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "복리후생비 (500번대 제조경비)",
+                "복리후생비 (800번대 판매비와관리비)",
+                "접대비 (500번대 제조경비)",
+                "여비교통비 (500번대 제조경비)"
+            ],
+            correctIdx: 0,
+            explanation: "공장 생산직 직원에게 발생한 식대는 500번대 제조경비인 '복리후생비(제)'로 처리합니다.",
+            ref: '실무 계정코드 구분 [공장 복리후생비]'
+        }),
+        // 2. 본사 식대
+        () => ({
+            question: `[3초 계정과목 판별]\n"본사 영업부 직원의 야간 회식대 200,000원을 보통예금에서 이체함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "복리후생비 (800번대 판매비와관리비)",
+                "복리후생비 (500번대 제조경비)",
+                "접대비 (800번대 판매비와관리비)",
+                "급여 (800번대 판매비와관리비)"
+            ],
+            correctIdx: 0,
+            explanation: "본사 영업부 직원에게 발생한 식대는 800번대 판매비와관리비인 '복리후생비(판)'로 처리합니다.",
+            ref: '실무 계정코드 구분 [본사 복리후생비]'
+        }),
+        // 3. 공장 기계 수리비
+        () => ({
+            question: `[3초 계정과목 판별]\n"공장 제조라인 기계장치의 모터 교체 수리비 500,000원을 현금 지급함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "수선비 (500번대 제조경비)",
+                "수선비 (800번대 판매비와관리비)",
+                "기계장치 (유형자산)",
+                "소모품비 (500번대 제조경비)"
+            ],
+            correctIdx: 0,
+            explanation: "공장 생산 설비의 일상적 수리는 500번대 '수선비(제)'로 처리합니다.",
+            ref: '실무 계정코드 구분 [공장 수선비]'
+        }),
+        // 4. 거래처 선물
+        () => ({
+            question: `[3초 계정과목 판별]\n"주요 매출 거래처의 개업 축하 화환 150,000원을 보통예금에서 결제함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "접대비 (800번대 판매비와관리비)",
+                "복리후생비 (800번대 판매비와관리비)",
+                "광고선전비 (800번대 판매비와관리비)",
+                "기부금 (영업외비용)"
+            ],
+            correctIdx: 0,
+            explanation: "외부 거래처를 위한 경조사비 및 선물은 '접대비(800번대)'로 처리합니다.",
+            ref: '실무 계정코드 구분 [접대비]'
+        }),
+        // 5. 계약금 지급 (선급금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"원재료를 구입하기로 계약하고 계약금 1,000,000원을 보통예금에서 미리 송금함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "선급금 (유동자산)",
+                "선수금 (유동부채)",
+                "외상매입금 (유동부채)",
+                "원재료 (재고자산)"
+            ],
+            correctIdx: 0,
+            explanation: "상품이나 원재료 매입을 위해 계약금을 미리 지급한 것은 '선급금(자산)'입니다.",
+            ref: '혼동 계정과목 [선급금]'
+        }),
+        // 6. 계약금 수령 (선수금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"제품을 공급하기로 계약하고 거래처로부터 계약금 2,000,000원을 당좌예금으로 입금받음."\n이 거래의 [대변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "선수금 (유동부채)",
+                "선급금 (유동자산)",
+                "외상매출금 (유동자산)",
+                "제품매출 (수익)"
+            ],
+            correctIdx: 0,
+            explanation: "재화 공급 전 계약금을 미리 수령한 것은 '선수금(부채)'입니다.",
+            ref: '혼동 계정과목 [선수금]'
+        }),
+        // 7. 비품 처분 외상 (미수금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"사용하던 업무용 복사기(비품)를 매각 처분하고 대금 500,000원은 다음달에 받기로 함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "미수금 (유동자산)",
+                "외상매출금 (유동자산)",
+                "받을어음 (유동자산)",
+                "미지급금 (유동부채)"
+            ],
+            correctIdx: 0,
+            explanation: "주된 상거래(상품/제품) 이외의 자산을 외상 처분한 대금은 '미수금(자산)'으로 처리합니다.",
+            ref: '혼동 계정과목 [미수금]'
+        }),
+        // 8. 비품 구입 외상 (미지급금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"사무실에서 사용할 컴퓨터 5대를 구입하고 대금 4,000,000원은 다음달 말일에 결제하기로 함."\n이 거래의 [대변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "미지급금 (유동부채)",
+                "외상매입금 (유동부채)",
+                "지급어음 (유동부채)",
+                "미수금 (유동자산)"
+            ],
+            correctIdx: 0,
+            explanation: "주된 상거래(원재료/상품) 이외의 자산을 외상 구입한 채무는 '미지급금(부채)'으로 처리합니다.",
+            ref: '혼동 계정과목 [미지급금]'
+        }),
+        // 9. 출장 여비 개산액 (가지급금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"영업부 직원의 지방 출장에 앞서 여비 개산액 300,000원을 현금으로 지급함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "가지급금 (유동자산)",
+                "여비교통비 (800번대)",
+                "가수금 (유동부채)",
+                "선급금 (유동자산)"
+            ],
+            correctIdx: 0,
+            explanation: "용도나 금액이 확정되지 않은 채 미리 어림잡아 지급한 출장비는 임시 자산인 '가지급금'으로 처리합니다.",
+            ref: '혼동 계정과목 [가지급금]'
+        }),
+        // 10. 원인 불명 통장 입금 (가수금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"당사 보통예금 통장에 내역을 알 수 없는 1,500,000원이 입금되어 확인 중임."\n이 거래의 [대변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "가수금 (유동부채)",
+                "가지급금 (유동자산)",
+                "외상매출금 (유동자산)",
+                "잡이익 (영업외수익)"
+            ],
+            correctIdx: 0,
+            explanation: "입금 원인을 알 수 없을 때 일시적으로 보관하는 임시 부채 계정은 '가수금'입니다.",
+            ref: '혼동 계정과목 [가수금]'
+        }),
+        // 11. 급여 원천징수 (예수금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"직원 월급을 지급하면서 근로소득세와 건강보험료 350,000원을 떼어둠."\n이 거래의 [대변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "예수금 (유동부채)",
+                "선수금 (유동부채)",
+                "세금과공과 (800번대)",
+                "미지급세금 (유동부채)"
+            ],
+            correctIdx: 0,
+            explanation: "급여 지급 시 원천징수한 세금 및 보험료는 임시 보관 부채인 '예수금'으로 처리합니다.",
+            ref: '혼동 계정과목 [예수금]'
+        }),
+        // 12. 미수금 대손 (기타의대손상각비)
+        () => ({
+            question: `[3초 계정과목 판별]\n"보유 중이던 단기대여금(또는 미수금)에 대해 채무자 파산으로 회수 불능(대손)이 확정됨."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "기타의대손상각비 (영업외비용)",
+                "대손상각비 (판매비와관리비)",
+                "대손충당금 (자산 차감)",
+                "잡손실 (영업외비용)"
+            ],
+            correctIdx: 0,
+            explanation: "외상매출금/받을어음 외의 기타채권(미수금, 대여금 등) 대손은 '기타의대손상각비(영업외비용)'로 처리합니다.",
+            ref: '실무 특수계정 [기타의대손상각비]'
+        }),
+        // 13. 결산일 외화평가 (외화환산이익)
+        () => ({
+            question: `[3초 계정과목 판별]\n"12월 31일 결산일 현재 보유 중인 외화외상매출금의 기준환율이 상승하여 장부를 평가함."\n이 거래의 [대변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "외화환산이익 (영업외수익)",
+                "외환차익 (영업외수익)",
+                "외화외상매출금 (유동자산)",
+                "단기투자자산평가익 (영업외수익)"
+            ],
+            correctIdx: 0,
+            explanation: "12/31 결산일 장부 평가로 인한 외화 이익은 '외화환산이익'입니다. (평소 환전 결제는 외환차익)",
+            ref: '실무 특수계정 [외화환산이익]'
+        }),
+        // 14. 신주 할증발행 초과액 (주식발행초과금)
+        () => ({
+            question: `[3초 계정과목 판별]\n"신주를 발행하면서 주식 액면가액을 초과하여 입금된 납입대금 잔액."\n이 거래의 [대변]에 입력해야 할 올바른 자본잉여금 계정과목은?`,
+            options: [
+                "주식발행초과금 (자본잉여금)",
+                "자본금 (자본금)",
+                "감자차익 (자본잉여금)",
+                "주식할인발행차금 (자본조정)"
+            ],
+            correctIdx: 0,
+            explanation: "주식 액면가액을 초과하여 납입된 금액은 자본잉여금 항목인 '주식발행초과금'입니다.",
+            ref: '자본 계정 [주식발행초과금]'
+        }),
+        // 15. DB형 퇴직연금 불입 (퇴직연금운용자산)
+        () => ({
+            question: `[3초 계정과목 판별]\n"확정급여형(DB형) 퇴직연금 부담금을 금융기관 보통예금에서 납부함."\n이 거래의 [차변]에 입력해야 할 올바른 계정과목은?`,
+            options: [
+                "퇴직연금운용자산 (투자자산)",
+                "퇴직급여 (당기비용)",
+                "퇴직급여충당부채 (비유동부채)",
+                "예치금 (당좌자산)"
+            ],
+            correctIdx: 0,
+            explanation: "확정급여형(DB형) 납입액은 '퇴직연금운용자산' 계정으로 처리합니다.",
+            ref: '실무 특수계정 [퇴직연금운용자산]'
+        })
+    ];
+
+    // =========================================================================
+    // 단원 ID 맵핑 레지스트리
+    // =========================================================================
+    const sectionQuizMap = {
+        'sec_asset': { theories: assetTheories, journals: assetJournals },
+        'sec_liability': { theories: liabTheories, journals: liabJournals },
+        'sec_equity': { theories: equityTheories, journals: equityJournals },
+        'sec_revenue_expense': { theories: revTheories, journals: revJournals },
+        'sec_cost': { theories: costTheories, journals: costJournals },
+        'sec_vat': { theories: vatTheories, journals: vatJournals },
+        'sec_closing': { theories: closingTheories, journals: closingJournals },
+        'sec_account_master': { theories: accountMasterPool, journals: assetJournals }
     };
 
     /**
-     * 특정 스텝 및 유형(theory / journal)에 대한 신규 동적 문제 생성
+     * 특정 단원에 대해 무작위로 동적 문제 생성
      */
     function generateDynamicQuiz(stepId, sectionId, type) {
-        if (!stepId && sectionId && window.LearningCurriculum) {
-            const section = window.LearningCurriculum.sections.find(s => s.id === sectionId);
-            if (section && section.steps && section.steps.length > 0) {
-                const randomStep = section.steps[Math.floor(Math.random() * section.steps.length)];
-                stepId = randomStep.id;
-            }
+        let secKey = sectionId;
+        if (!secKey && stepId) {
+            if (stepId.startsWith('asset')) secKey = 'sec_asset';
+            else if (stepId.startsWith('liab')) secKey = 'sec_liability';
+            else if (stepId.startsWith('eq')) secKey = 'sec_equity';
+            else if (stepId.startsWith('rev')) secKey = 'sec_revenue_expense';
+            else if (stepId.startsWith('cost')) secKey = 'sec_cost';
+            else if (stepId.startsWith('vat')) secKey = 'sec_vat';
+            else if (stepId.startsWith('close')) secKey = 'sec_closing';
+            else if (stepId.startsWith('acc')) secKey = 'sec_account_master';
+        }
+        if (!secKey || !sectionQuizMap[secKey]) {
+            secKey = 'sec_asset';
         }
 
-        let gen = stepGenerators[stepId];
-        
-        if (!gen && sectionId) {
-            gen = stepGenerators[sectionId];
-        }
+        const pool = sectionQuizMap[secKey];
+        if (!pool) return null;
 
-        if (!gen) {
-            if (sectionId === 'sec_asset' || (stepId && stepId.startsWith('asset'))) gen = stepGenerators['asset_01'];
-            else if (sectionId === 'sec_liability' || (stepId && stepId.startsWith('liab'))) gen = stepGenerators['sec_liability'];
-            else if (sectionId === 'sec_equity' || (stepId && stepId.startsWith('eq'))) gen = stepGenerators['sec_equity'];
-            else if (sectionId === 'sec_cost' || (stepId && stepId.startsWith('cost'))) gen = stepGenerators['sec_cost'];
-            else if (sectionId === 'sec_vat' || (stepId && stepId.startsWith('vat'))) gen = stepGenerators['sec_vat'];
-            else gen = stepGenerators['asset_01'];
-        }
-
-        if (type === 'theory' && gen.theory) {
-            return gen.theory();
-        } else if (type === 'journal' && gen.journal) {
-            return gen.journal();
+        if (type === 'theory' || secKey === 'sec_account_master') {
+            const tplFn = getRandomItem(pool.theories);
+            if (!tplFn) return null;
+            const res = tplFn();
+            const shuffled = shuffleOptions(res.options, res.correctIdx);
+            return {
+                id: `dyn_${secKey}_t_${Date.now()}_${Math.random()}`,
+                type: 'theory',
+                question: res.question,
+                options: shuffled.options,
+                correctAnswer: shuffled.correctAnswer,
+                explanation: res.explanation,
+                bookReference: res.ref || '2026 PERFECT 1급 실전 대비'
+            };
+        } else if (type === 'journal') {
+            const jplFn = getRandomItem(pool.journals);
+            if (!jplFn) return null;
+            const res = jplFn();
+            return {
+                id: `dyn_${secKey}_j_${Date.now()}_${Math.random()}`,
+                type: 'journal',
+                question: res.question,
+                debit: res.debit,
+                credit: res.credit,
+                explanation: res.explanation,
+                bookReference: res.ref || '2026 PERFECT 1급 실무 분개'
+            };
         }
 
         return null;

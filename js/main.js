@@ -714,7 +714,7 @@ function cancelPaste() {
 }
 
 // --- 1급 맞춤 코스 학습 (Learning Course) 뷰 전환 라우팅 ---
-function openLearningCourseApp() {
+function openLearningCourseApp() { console.log('openLearningCourseApp called'); console.log('mainView, quizView, learningView elements:', document.getElementById('main-content-view'), document.getElementById('quiz-content-view'), document.getElementById('learning-course-view'));
     const mainView = document.getElementById('main-content-view');
     const quizView = document.getElementById('quiz-content-view');
     const learningView = document.getElementById('learning-course-view');
