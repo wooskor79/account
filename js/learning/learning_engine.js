@@ -594,8 +594,9 @@ window.LearningEngine = (function() {
                         <button onclick="LearningEngine.openSection('${sectionId}', 0, 'quiz')" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md transition flex items-center gap-1.5 shrink-0">
                             <span>문제 바로 풀기</span> <i class="fa-solid fa-bolt text-yellow-300"></i>
                         </button>
-                        <button onclick="LearningEngine.renderDashboard()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-1.5 shrink-0">
-                            <i class="fa-solid fa-house"></i>
+                        <button onclick="LearningEngine.renderDashboard()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200/80 text-slate-700 font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-1.5 shrink-0 shadow-2xs">
+                            <span>🏠</span>
+                            <span>학습홈</span>
                         </button>
                     </div>
                 </div>
@@ -706,10 +707,15 @@ window.LearningEngine = (function() {
                     ` : '<p class="text-sm text-slate-500">요약 내용이 없습니다.</p>'}
                 </div>
                 
-                <div class="flex justify-between items-center mt-8">
+                <div class="flex flex-wrap gap-2.5 justify-between items-center mt-8">
                     <button class="px-5 py-3 rounded-xl font-bold text-xs sm:text-sm ${currentStepIdx > 0 ? 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm transition' : 'opacity-0 pointer-events-none'}"
                             onclick="LearningEngine.openSection('${sectionId}', ${currentStepIdx - 1}, 'theory')">
                         <i class="fa-solid fa-arrow-left mr-1.5"></i> 이전 스텝 (${currentStepIdx > 0 ? currentStepIdx : 1})
+                    </button>
+
+                    <button class="px-5 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-xl shadow-sm text-xs sm:text-sm transition flex items-center gap-1.5"
+                            onclick="LearningEngine.renderDashboard()">
+                        <span>🏠</span> <span>대시보드로 가기</span>
                     </button>
                     
                     ${isLastStep ? `
