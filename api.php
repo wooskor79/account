@@ -1530,7 +1530,7 @@ if ($action) {
         $total_correct = 0;
         $total_pct_sum = 0;
 
-        // 8대 단원 목표 가중치
+        // 9대 단원 목표 가중치
         $section_weights = [
             'sec_asset' => 12,
             'sec_liability' => 12,
@@ -1539,9 +1539,10 @@ if ($action) {
             'sec_cost' => 16,
             'sec_vat' => 16,
             'sec_closing' => 18,
-            'sec_account_master' => 15
+            'sec_account_master' => 15,
+            'sec_grade1_only' => 20
         ];
-        $total_max_score = array_sum($section_weights); // 113점
+        $total_max_score = array_sum($section_weights); // 133점
 
         foreach ($users as $u) {
             $uid = $u['id'];
@@ -1561,6 +1562,7 @@ if ($action) {
                 if ($s_id === 'sec_cost' || $s_id === 'sec_vat') { $reqT = 8; $reqJ = 8; }
                 else if ($s_id === 'sec_closing') { $reqT = 8; $reqJ = 10; }
                 else if ($s_id === 'sec_account_master') { $reqT = 15; $reqJ = 0; }
+                else if ($s_id === 'sec_grade1_only') { $reqT = 10; $reqJ = 10; }
 
                 $curT = min($reqT, $c['theory'] ?? 0);
                 $curJ = min($reqJ, $c['journal'] ?? 0);

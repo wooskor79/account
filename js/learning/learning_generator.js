@@ -722,6 +722,206 @@ window.LearningGenerator = (function() {
     ];
 
     // =========================================================================
+    // 9단원: 1급 전용 초격차 시크릿 특강 (1급 Only & 2급 사각지대)
+    // =========================================================================
+    const grade1OnlyTheories = [
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const qty = getRandomInt(10, 30) * 100;
+            const cost = getRandomInt(10, 20) * 1000;
+            const fair = getRandomInt(6, 9) * 1000;
+            return {
+                question: `다음 중 전산회계 1급 유가증권 회계처리에 대한 설명으로 가장 옳은 것은?`,
+                options: [
+                    `단기매매증권 취득 수수료는 영업외비용으로, 매도가능증권 취득 수수료는 자산 취득원가에 가산한다.`,
+                    `매도가능증권평가손익은 손익계산서의 영업외손익(당기손익)으로 처리한다.`,
+                    `단기매매증권평가손익은 재무상태표의 기타포괄손익누계액(자본)으로 분류한다.`,
+                    `매도가능증권 처분 시 기존에 계상된 매도가능증권평가손익 잔액은 처분손익 계산 시 무시한다.`
+                ],
+                correctIdx: 0,
+                explanation: `단기매매증권 취득수수료는 영업외비용(900번대)이지만, 매도가능증권 취득수수료는 취득원가에 가산합니다. 또한 매도가능증권평가손익은 기타포괄손익누계액(자본)입니다.`,
+                ref: '1급 초격차 [매도가능증권 vs 단기매매증권]'
+            };
+        },
+        () => {
+            const normalLoss = getRandomInt(10, 30) * 10000;
+            const abnormalLoss = getRandomInt(20, 50) * 10000;
+            return {
+                question: `기말 재고실사 결과 정상감모손실 ${formatNumber(normalLoss)}원과 비정상감모손실 ${formatNumber(abnormalLoss)}원이 발생하였다. 이에 대한 올바른 회계처리는?`,
+                options: [
+                    `정상감모손실은 매출원가에 가산하고, 비정상감모손실은 영업외비용(적요 8. 타계정대체)으로 처리한다.`,
+                    `정상감모손실과 비정상감모손실 모두 판매비와관리비로 처리한다.`,
+                    `정상감모손실은 영업외비용으로, 비정상감모손실은 매출원가로 처리한다.`,
+                    `비정상감모손실은 전표 입력 시 적요 입력을 생략하여도 무방하다.`
+                ],
+                correctIdx: 0,
+                explanation: `정상감모손실은 매출원가에 포함(분개X)되며, 비정상감모손실은 영업외비용(재고자산감모손실)으로 대변 계정에 [적요 8. 타계정으로 대체]를 반드시 걸어야 합니다.`,
+                ref: '1급 초격차 [재고자산 감모손실]'
+            };
+        },
+        () => {
+            const parVal = 10000000;
+            const issueFee = getRandomInt(10, 30) * 10000;
+            return {
+                question: `(주)대한은 사채(액면가액 10,000,000원)를 발행하면서 사채발행수수료 ${formatNumber(issueFee)}원이 발생하였다. 사채발행비에 대한 올바른 회계처리는?`,
+                options: [
+                    `사채발행가액에서 직접 차감하여 사채할인발행차금에 가산하거나 사채할증발행차금에서 차감한다.`,
+                    `당기 판매비와관리비(지급수수료)로 전액 비용 처리한다.`,
+                    `영업외비용(사채발행비용)으로 별도 계상한다.`,
+                    `사채 액면가액에 직접 가산하여 사채 원금으로 계상한다.`
+                ],
+                correctIdx: 0,
+                explanation: `일반기업회계기준상 사채발행비는 별도 비용으로 처리하지 않고, 사채발행가액에서 직접 차감합니다.`,
+                ref: '1급 초격차 [사채발행비 회계처리]'
+            };
+        },
+        () => {
+            const dbVal = getRandomInt(3, 7) * 1000000;
+            const dcVal = getRandomInt(2, 5) * 1000000;
+            return {
+                question: `퇴직연금제도에 대한 설명으로 가장 올바른 것은?`,
+                options: [
+                    `확정급여형(DB) 불입액은 '퇴직연금운용자산(자산)'으로, 확정기여형(DC) 불입액은 '퇴직급여(비용)'로 처리한다.`,
+                    `확정급여형(DB) 불입 시 즉시 전액 비용(퇴직급여)으로 회계처리하고 끝낸다.`,
+                    `확정기여형(DC) 불입액은 기업의 자산인 '퇴직연금운용자산'으로 계상한다.`,
+                    `DB형과 DC형 모두 기업이 운용 수익과 손실에 대한 최종 책임을 진다.`
+                ],
+                correctIdx: 0,
+                explanation: `DB형(확정급여형)은 회사가 운용하므로 불입 시 자산(퇴직연금운용자산)으로 처리하고, DC형(확정기여형)은 근로자가 운용하므로 불입 시 즉시 비용(퇴직급여)으로 처리합니다.`,
+                ref: '1급 초격차 [퇴직연금 DB vs DC]'
+            };
+        },
+        () => {
+            const actualCost = getRandomInt(80, 120) * 10000;
+            const estCost = actualCost + getRandomInt(5, 20) * 10000;
+            const diff = estCost - actualCost;
+            return {
+                question: `당기 제조간접비 실제발생액이 ${formatNumber(actualCost)}원이고, 예정배부액이 ${formatNumber(estCost)}원일 때 제조간접비 배부차이는?`,
+                options: [
+                    `${formatNumber(diff)}원 과대배부`,
+                    `${formatNumber(diff)}원 과소배부`,
+                    `${formatNumber(actualCost)}원 과대배부`,
+                    `${formatNumber(estCost)}원 과소배부`
+                ],
+                correctIdx: 0,
+                explanation: `제조간접비 배부차이는 [예정배부액 - 실제발생액]으로 계산하며, 예정배부액(${formatNumber(estCost)}원)이 실제발생액(${formatNumber(actualCost)}원)보다 ${formatNumber(diff)}원 더 크므로 '${formatNumber(diff)}원 과대배부'입니다.`,
+                ref: '1급 초격차 [제조간접비 배부차이 분석]'
+            };
+        },
+        () => {
+            return {
+                question: `다음 중 부가가치세법상 매입세액공제가 가능한 거래는 어느 것인가?`,
+                options: [
+                    `공장 원자재 운반용 1톤 화물트럭 구입 및 수리비 (세금계산서 수취)`,
+                    `거래처 접대용 선물세트 구입비용 (54.불공)`,
+                    `본사 대표이사 전용 2,500cc 비영업용 소형승용차 주유비 (54.불공)`,
+                    `토지의 자본적 지출 관련 정지공사 비용 (54.불공)`
+                ],
+                correctIdx: 0,
+                explanation: `접대비, 1,000cc 초과 비영업용 승용차, 토지 관련 지출은 54.불공 사유입니다. 반면 화물트럭, 1,000cc 이하 경차(모닝/스파크), 9인승 이상 승합차는 매입세액 공제(51.과세)가 가능합니다.`,
+                ref: '1급 초격차 [54.불공 매입세액불공제 판별]'
+            };
+        },
+        () => {
+            return {
+                question: `전산회계 1급 결산 마감 시 4대 부속장부의 올바른 마감 순서는?`,
+                options: [
+                    `제조원가명세서 ➔ 손익계산서 ➔ 이익잉여금처분계산서 ➔ 재무상태표`,
+                    `재무상태표 ➔ 손익계산서 ➔ 제조원가명세서 ➔ 이익잉여금처분계산서`,
+                    `손익계산서 ➔ 제조원가명세서 ➔ 재무상태표 ➔ 이익잉여금처분계산서`,
+                    `이익잉여금처분계산서 ➔ 손익계산서 ➔ 제조원가명세서 ➔ 재무상태표`
+                ],
+                correctIdx: 0,
+                explanation: `장부 마감 순서는 '제-손-이-표'(제조원가명세서 ➔ 손익계산서 ➔ 이익잉여금처분계산서(F6전표추가) ➔ 재무상태표) 순서로 마감해야 최종 당기순이익과 미처분이익잉여금이 일치합니다.`,
+                ref: '1급 초격차 [결산 마감 4대 장부 순서]'
+            };
+        }
+    ];
+
+    const grade1OnlyJournals = [
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const bookVal = getRandomInt(5, 10) * 1000000;
+            const evalGain = getRandomInt(5, 15) * 100000;
+            const sellPrice = bookVal + getRandomInt(10, 20) * 100000;
+            const totalGain = (sellPrice - bookVal) + evalGain;
+            return {
+                question: `(주)대한은 장기투자목적으로 보유 중인 ${comp}의 매도가능증권(장부가액 ${formatNumber(bookVal)}원, 과거 매도가능증권평가이익 잔액 ${formatNumber(evalGain)}원 있음)을 ${formatNumber(sellPrice)}원에 처분하고 대금은 보통예금으로 송금받았다.`,
+                debit: [
+                    { account: '보통예금', amount: sellPrice },
+                    { account: '매도가능증권평가이익', amount: evalGain }
+                ],
+                credit: [
+                    { account: '매도가능증권', amount: bookVal },
+                    { account: '매도가능증권처분이익', amount: totalGain }
+                ],
+                explanation: `매도가능증권 처분 시 대변에 매도가능증권(${formatNumber(bookVal)}원)을 장부 제거하고, 차변에 보통예금(${formatNumber(sellPrice)}원)과 과거 매도가능증권평가이익 잔액(${formatNumber(evalGain)}원)을 상계 제거한 후 차액을 매도가능증권처분이익(${formatNumber(totalGain)}원)으로 인식합니다.`,
+                ref: '1급 초격차 [매도가능증권 처분 상계 분개]'
+            };
+        },
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const loss = getRandomInt(2, 6) * 100000;
+            return {
+                question: `공장 창고의 도난으로 인해 원재료 장부상 재고 중 ${formatNumber(loss)}원(원가)이 부족한 것을 발견하여 비정상 감모손실로 회계처리하였다.`,
+                debit: [{ account: '재고자산감모손실', amount: loss }],
+                credit: [{ account: '원재료', amount: loss }],
+                explanation: `비정상 감모손실은 차변에 영업외비용인 '재고자산감모손실'로 처리하고, 대변 원재료 계정에 [적요 8번: 타계정으로 대체]를 반드시 적용합니다.`,
+                ref: '1급 초격차 [비정상 감모손실 적요8번 분개]'
+            };
+        },
+        () => {
+            const bank = getRandomItem(BANKS);
+            const loan = getRandomInt(3, 7) * 10000000;
+            return {
+                question: `12월 31일 결산일 현재 ${bank}의 장기차입금 ${formatNumber(loan)}원 중 만기가 1년 이내인 내년 6월 30일에 도래하는 금액이 ${formatNumber(loan)}원이다. 유동성 대체 분개를 행하시오.`,
+                debit: [{ account: '장기차입금', amount: loan }],
+                credit: [{ account: '유동성장기부채', amount: loan }],
+                explanation: `만기가 1년 이내로 도래한 비유동부채(장기차입금)는 차변으로 감소시키고, 대변에 유동부채 항목인 '유동성장기부채'로 대체합니다.`,
+                ref: '1급 초격차 [유동성장기부채 대체 분개]'
+            };
+        },
+        () => {
+            const comp = getRandomItem(COMPANIES);
+            const price = getRandomInt(5, 15) * 100000;
+            const vat = Math.round(price * 0.1);
+            const total = price + vat;
+            return {
+                question: `매출 거래처인 ${comp}에 선물할 명절 선물세트(공급가액 ${formatNumber(price)}원, 부가세 ${formatNumber(vat)}원)를 구입하고 전자세금계산서를 발급받았으며 대금은 보통예금에서 이체하였다. (54.불공)`,
+                debit: [{ account: '접대비', amount: total }],
+                credit: [{ account: '보통예금', amount: total }],
+                explanation: `접대비 관련 매입세액은 불공제(54.불공) 대상이므로 부가세대급금을 분리하지 않고 공급대가(부가세 포함 ${formatNumber(total)}원) 전액을 '접대비(800번대)'로 처리합니다.`,
+                ref: '1급 초격차 [54.불공 접대비 분개]'
+            };
+        },
+        () => {
+            const factoryDining = getRandomInt(2, 5) * 100000;
+            return {
+                question: `공장 생산직 근로자들의 야간 작업 식대 ${formatNumber(factoryDining)}원을 (주)맛나식당에서 보통예금으로 지급하였다.`,
+                debit: [{ account: '복리후생비', amount: factoryDining }],
+                credit: [{ account: '보통예금', amount: factoryDining }],
+                explanation: `공장 생산직 근로자를 위한 식대는 500번대 제조경비인 '복리후생비(제)'로 분개합니다.`,
+                ref: '1급 초격차 [500번대 제조경비 분개]'
+            };
+        },
+        () => {
+            const prepaidTax = getRandomInt(5, 15) * 100000;
+            const corporateTax = prepaidTax + getRandomInt(10, 30) * 100000;
+            const payTax = corporateTax - prepaidTax;
+            return {
+                question: `12월 31일 결산일 현재 법인세 추산액은 ${formatNumber(corporateTax)}원이다. 당기 중 납부한 중간예납세액 등 선납세금 잔액 ${formatNumber(prepaidTax)}원을 정리하고 나머지 잔액은 미지급세금으로 계상하시오.`,
+                debit: [{ account: '법인세등', amount: corporateTax }],
+                credit: [
+                    { account: '선납세금', amount: prepaidTax },
+                    { account: '미지급세금', amount: payTax }
+                ],
+                explanation: `기말 법인세 정리 시 차변에 당기 총 법인세비용(법인세등 ${formatNumber(corporateTax)}원), 대변에 기납부한 선납세금(${formatNumber(prepaidTax)}원)을 상계하고 나머지 잔여 납부세액을 '미지급세금(${formatNumber(payTax)}원)'으로 처리합니다.`,
+                ref: '1급 초격차 [법인세 결산 정리 분개]'
+            };
+        }
+    ];
+
+    // =========================================================================
     // 단원 ID 맵핑 레지스트리
     // =========================================================================
     const sectionQuizMap = {
@@ -732,7 +932,8 @@ window.LearningGenerator = (function() {
         'sec_cost': { theories: costTheories, journals: costJournals },
         'sec_vat': { theories: vatTheories, journals: vatJournals },
         'sec_closing': { theories: closingTheories, journals: closingJournals },
-        'sec_account_master': { theories: accountMasterPool, journals: assetJournals }
+        'sec_account_master': { theories: accountMasterPool, journals: assetJournals },
+        'sec_grade1_only': { theories: grade1OnlyTheories, journals: grade1OnlyJournals }
     };
 
     /**
@@ -749,6 +950,7 @@ window.LearningGenerator = (function() {
             else if (stepId.startsWith('vat')) secKey = 'sec_vat';
             else if (stepId.startsWith('close')) secKey = 'sec_closing';
             else if (stepId.startsWith('acc')) secKey = 'sec_account_master';
+            else if (stepId.startsWith('step_g1') || stepId.startsWith('g1')) secKey = 'sec_grade1_only';
         }
         if (!secKey || !sectionQuizMap[secKey]) {
             secKey = 'sec_asset';

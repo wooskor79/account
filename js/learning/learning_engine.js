@@ -441,7 +441,7 @@ window.LearningEngine = (function() {
                                     <tr class="bg-slate-50 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
                                         <th class="py-3 px-4">학습자명</th>
                                         <th class="py-3 px-3">가입일 / 최근접속</th>
-                                        <th class="py-3 px-4 w-48">8대 단원 진도율</th>
+                                        <th class="py-3 px-4 w-48">9대 단원 진도율</th>
                                         <th class="py-3 px-3 text-center">완료 단원</th>
                                         <th class="py-3 px-3 text-center">문제 풀이</th>
                                         <th class="py-3 px-3 text-center">오답노트</th>
@@ -470,7 +470,7 @@ window.LearningEngine = (function() {
                                             </td>
                                             <td class="py-3.5 px-3 text-center font-bold">
                                                 <span class="px-2 py-0.5 rounded-full text-[11px] ${u.completed_sections > 0 ? 'bg-emerald-100 text-emerald-700 font-extrabold' : 'bg-slate-100 text-slate-500'}">
-                                                    ${u.completed_sections} / 8
+                                                    ${u.completed_sections} / 9
                                                 </span>
                                             </td>
                                             <td class="py-3.5 px-3 text-center">
@@ -530,7 +530,7 @@ window.LearningEngine = (function() {
                     </span>
                     <div>
                         <h3 class="text-base font-extrabold text-slate-900">${escapeHtml(u.username)}님의 단원별 학습 상세</h3>
-                        <p class="text-xs text-slate-400">전체 달성률: <strong>${u.total_pct}%</strong> (완료 ${u.completed_sections}/8단원)</p>
+                        <p class="text-xs text-slate-400">전체 달성률: <strong>${u.total_pct}%</strong> (완료 ${u.completed_sections}/9단원)</p>
                     </div>
                 </div>
                 <button onclick="LearningEngine.closeAdminUserDetailModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 font-bold flex items-center justify-center">
@@ -596,7 +596,7 @@ window.LearningEngine = (function() {
             if (saved) lastPosInfo = JSON.parse(saved);
         } catch(e) {}
 
-        // --- 정밀 마이크로 진도율 연산 시스템 (8대 단원 체제) ---
+        // --- 정밀 마이크로 진도율 연산 시스템 (9대 단원 체제) ---
         let totalWeightAll = 0;
         let acquiredWeightAll = 0;
         let completedSectionsCount = 0;
@@ -605,6 +605,7 @@ window.LearningEngine = (function() {
             if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8 };
             if (sId === 'sec_closing') return { reqT: 8, reqJ: 10 };
             if (sId === 'sec_account_master') return { reqT: 15, reqJ: 0 };
+            if (sId === 'sec_grade1_only') return { reqT: 10, reqJ: 10 };
             return { reqT: 6, reqJ: 6 };
         }
 
@@ -675,7 +676,7 @@ window.LearningEngine = (function() {
                     <div class="mt-5 pt-4 border-t border-slate-200/80">
                         <div class="flex justify-between items-center mb-1.5 flex-wrap gap-1">
                             <span class="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
-                                📈 전체 8대 단원 달성률: <strong>${completedSectionsCount} / 8개 단원 완료</strong>
+                                📈 전체 9대 단원 달성률: <strong>${completedSectionsCount} / 9개 단원 완료</strong>
                             </span>
                             <span class="text-xs font-extrabold text-blue-600">
                                 정밀 학습 달성률 (${totalPct}%)
@@ -832,6 +833,7 @@ window.LearningEngine = (function() {
             if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8, desc: '필기 8문제, 분개 8문제를 완료하면 단원 마스터가 완료됩니다. (집중 심화 훈련)' };
             if (sId === 'sec_closing') return { reqT: 8, reqJ: 10, desc: '필기 8문제, 분개 10문제를 완료하면 결산 마스터가 완료됩니다. (수동/자동결산 집중 훈련)' };
             if (sId === 'sec_account_master') return { reqT: 15, reqJ: 0, desc: '금액 없이 계정과목을 3초 만에 판별하는 스피드 훈련 15문제를 완료하면 계정 마스터가 완료됩니다. (500번대/800번대/혼동계정 집중)' };
+            if (sId === 'sec_grade1_only') return { reqT: 10, reqJ: 10, desc: '필기 10문제, 분개 10문제를 완료하면 1급 초격차 마스터가 완료됩니다. (1급 Only & 2급 사각지대 완벽 총정리)' };
             return { reqT: 6, reqJ: 6, desc: '필기 6문제, 분개 6문제를 완료하면 단원이 마스터됩니다.' };
         }
 
@@ -1013,6 +1015,7 @@ window.LearningEngine = (function() {
                 if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8, desc: '필기 8문제, 분개 8문제를 완료하면 단원 마스터가 완료됩니다. (집중 심화 훈련)' };
                 if (sId === 'sec_closing') return { reqT: 8, reqJ: 10, desc: '필기 8문제, 분개 10문제를 완료하면 결산 마스터가 완료됩니다. (수동/자동결산 집중 훈련)' };
                 if (sId === 'sec_account_master') return { reqT: 15, reqJ: 0, desc: '금액 없이 계정과목을 3초 만에 판별하는 스피드 훈련 15문제를 완료하면 계정 마스터가 완료됩니다. (500번대/800번대/혼동계정 집중)' };
+                if (sId === 'sec_grade1_only') return { reqT: 10, reqJ: 10, desc: '필기 10문제, 분개 10문제를 완료하면 1급 초격차 마스터가 완료됩니다. (1급 Only & 2급 사각지대 완벽 총정리)' };
                 return { reqT: 6, reqJ: 6, desc: '필기 6문제, 분개 6문제를 완료하면 단원이 마스터됩니다.' };
             }
 
