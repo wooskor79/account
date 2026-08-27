@@ -1257,6 +1257,26 @@ if ($action) {
             exit(json_encode(['success' => false, 'message' => '이름과 비밀번호를 입력해주세요.']));
         }
 
+        // --- 관리자(admin) 로그인 처리 ---
+        if (mb_strtolower($username, 'UTF-8') === 'admin') {
+            if ($password === $admin_password) {
+                $_SESSION['learning_user'] = [
+                    'id' => 'admin',
+                    'username' => '관리자',
+                    'is_admin' => true
+                ];
+                echo json_encode([
+                    'success' => true,
+                    'message' => '관리자로 로그인되었습니다.',
+                    'user' => ['id' => 'admin', 'username' => '관리자', 'is_admin' => true]
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            } else {
+                http_response_code(401);
+                exit(json_encode(['success' => false, 'message' => '관리자 비밀번호가 올바르지 않습니다.']));
+            }
+        }
+
         $users = atomic_json_read($learning_users_file);
         if (!is_array($users)) $users = [];
 
@@ -1487,6 +1507,117 @@ if ($action) {
         echo json_encode([
             'success' => true,
             'wrong_notes' => $updated_prog[$user_id]['wrong_notes'] ?? []
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // 7) 관리자용 전체 학습자 진도 현황 통계 API
+    if ($action === 'learning_admin_stats') {
+        $cur_user = isset($_SESSION['learning_user']) ? $_SESSION['learning_user'] : null;
+        if (!$cur_user || empty($cur_user['is_admin'])) {
+            http_response_code(403);
+            exit(json_encode(['success' => false, 'message' => '관리자 권한이 필요합니다.']));
+        }
+
+        $users = atomic_json_read($learning_users_file);
+        if (!is_array($users)) $users = [];
+
+        $progress_data = atomic_json_read($learning_progress_file);
+        if (!is_array($progress_data)) $progress_data = [];
+
+        $user_list = [];
+        $total_solved = 0;
+        $total_correct = 0;
+        $total_pct_sum = 0;
+
+        // 8대 단원 목표 가중치
+        $section_weights = [
+            'sec_asset' => 12,
+            'sec_liability' => 12,
+            'sec_equity' => 12,
+            'sec_revenue_expense' => 12,
+            'sec_cost' => 16,
+            'sec_vat' => 16,
+            'sec_closing' => 18,
+            'sec_account_master' => 15
+        ];
+        $total_max_score = array_sum($section_weights); // 113점
+
+        foreach ($users as $u) {
+            $uid = $u['id'];
+            $u_prog = isset($progress_data[$uid]) ? $progress_data[$uid] : [];
+            $counts = $u_prog['correct_counts'] ?? [];
+            $stats = $u_prog['stats'] ?? ['solved_count' => 0, 'correct_count' => 0];
+            $wrong_notes = $u_prog['wrong_notes'] ?? [];
+
+            // 정밀 진도율 계산
+            $acquired_score = 0;
+            $completed_sections = 0;
+            $sec_details = [];
+
+            foreach ($section_weights as $s_id => $max_w) {
+                $c = $counts[$s_id] ?? ['theory' => 0, 'journal' => 0];
+                $reqT = 6; $reqJ = 6;
+                if ($s_id === 'sec_cost' || $s_id === 'sec_vat') { $reqT = 8; $reqJ = 8; }
+                else if ($s_id === 'sec_closing') { $reqT = 8; $reqJ = 10; }
+                else if ($s_id === 'sec_account_master') { $reqT = 15; $reqJ = 0; }
+
+                $curT = min($reqT, $c['theory'] ?? 0);
+                $curJ = min($reqJ, $c['journal'] ?? 0);
+                $sec_score = $curT + $curJ;
+                $acquired_score += $sec_score;
+
+                $sec_pct = round(($sec_score / $max_w) * 100);
+                $is_done = ($curT >= $reqT && ($reqJ === 0 || $curJ >= $reqJ));
+                if ($is_done) $completed_sections++;
+
+                $sec_details[$s_id] = [
+                    'score' => $sec_score,
+                    'max_score' => $max_w,
+                    'pct' => $sec_pct,
+                    'theory_count' => $c['theory'] ?? 0,
+                    'journal_count' => $c['journal'] ?? 0,
+                    'is_complete' => $is_done
+                ];
+            }
+
+            $user_pct = $total_max_score > 0 ? round(($acquired_score / $total_max_score) * 100) : 0;
+            $total_pct_sum += $user_pct;
+
+            $unresolved_wrong = count(array_filter($wrong_notes, function($wn) { return empty($wn['resolved']); }));
+
+            $total_solved += ($stats['solved_count'] ?? 0);
+            $total_correct += ($stats['correct_count'] ?? 0);
+
+            $user_list[] = [
+                'id' => $uid,
+                'username' => $u['username'],
+                'created_at' => $u['created_at'] ?? '',
+                'last_login' => $u['last_login'] ?? '',
+                'total_pct' => $user_pct,
+                'completed_sections' => $completed_sections,
+                'solved_count' => $stats['solved_count'] ?? 0,
+                'correct_count' => $stats['correct_count'] ?? 0,
+                'accuracy' => ($stats['solved_count'] ?? 0) > 0 ? round((($stats['correct_count'] ?? 0) / $stats['solved_count']) * 100) : 0,
+                'wrong_count' => count($wrong_notes),
+                'unresolved_wrong_count' => $unresolved_wrong,
+                'section_details' => $sec_details
+            ];
+        }
+
+        $user_count = count($users);
+        $avg_pct = $user_count > 0 ? round($total_pct_sum / $user_count) : 0;
+        $overall_accuracy = $total_solved > 0 ? round(($total_correct / $total_solved) * 100) : 0;
+
+        echo json_encode([
+            'success' => true,
+            'summary' => [
+                'total_users' => $user_count,
+                'avg_progress' => $avg_pct,
+                'total_solved' => $total_solved,
+                'overall_accuracy' => $overall_accuracy
+            ],
+            'users' => $user_list
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }

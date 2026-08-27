@@ -303,12 +303,289 @@ window.LearningEngine = (function() {
         openSection(curriculum.sections[0].id, 0);
     }
 
+    // --- 2. 관리자 및 학습자 대시보드 화면 ---
+    let adminStatsData = null;
+
+    async function renderAdminDashboard() {
+        const container = document.getElementById('learning-content-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="p-12 text-center text-slate-500 font-bold">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-indigo-600 mb-3 block"></i>
+                학습자 현황 및 통계 데이터를 불러오는 중입니다...
+            </div>
+        `;
+
+        try {
+            const res = await fetch('?action=learning_admin_stats');
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.message || '데이터를 불러오지 못했습니다.');
+            }
+            adminStatsData = data;
+            drawAdminDashboardUI(container, data);
+        } catch (err) {
+            container.innerHTML = `
+                <div class="p-8 text-center bg-rose-50 rounded-2xl border border-rose-200">
+                    <div class="text-rose-600 font-black text-base mb-2">❌ 통계 로딩 실패</div>
+                    <p class="text-xs text-rose-500 mb-4">${escapeHtml(err.message)}</p>
+                    <button onclick="LearningEngine.renderAdminDashboard()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold">다시 시도</button>
+                </div>
+            `;
+        }
+    }
+
+    function drawAdminDashboardUI(container, data) {
+        const summary = data.summary || { total_users: 0, avg_progress: 0, total_solved: 0, overall_accuracy: 0 };
+        const users = data.users || [];
+
+        container.innerHTML = `
+            <div class="learning-dashboard-wrapper space-y-6">
+                <!-- 관리자 헤더 배너 -->
+                <div class="p-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl text-white shadow-xl border border-indigo-900/50">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5">
+                            <div class="w-12 h-12 rounded-2xl bg-indigo-600/30 border border-indigo-400/30 flex items-center justify-center text-2xl shadow-inner">
+                                👑
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h2 class="text-xl font-black tracking-tight text-white">
+                                        전산회계 1급 학습 관리자 센터
+                                    </h2>
+                                    <span class="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-xs font-bold rounded-full border border-indigo-400/30">
+                                        ADMIN MODE
+                                    </span>
+                                </div>
+                                <p class="text-xs text-indigo-200/70 font-medium mt-0.5">
+                                    가입된 전체 학습자의 진도율, 문제 풀이 이력 및 오답 현황을 실시간 모니터링합니다.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2.5">
+                            <button onclick="LearningEngine.renderAdminDashboard()" class="px-3.5 py-2 bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-700/50 text-indigo-100 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
+                                <span>🔄</span> <span>새로고침</span>
+                            </button>
+                            <button onclick="LearningEngine.showLogoutModal()" class="px-3.5 py-2 bg-rose-900/50 hover:bg-rose-800 border border-rose-700/50 text-rose-100 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
+                                <span>🚪</span> <span>로그아웃</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4대 요약 카드 그리드 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-5 border-t border-indigo-800/40">
+                        <div class="bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
+                            <div class="text-[11px] font-bold text-indigo-300 mb-1">👥 총 가입 학습자</div>
+                            <div class="text-2xl font-black text-white">${summary.total_users}<span class="text-xs font-normal text-indigo-300 ml-1">명</span></div>
+                        </div>
+                        <div class="bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
+                            <div class="text-[11px] font-bold text-indigo-300 mb-1">📈 전체 평균 진도율</div>
+                            <div class="text-2xl font-black text-emerald-400">${summary.avg_progress}<span class="text-xs font-normal text-emerald-300 ml-1">%</span></div>
+                        </div>
+                        <div class="bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
+                            <div class="text-[11px] font-bold text-indigo-300 mb-1">📝 총 풀이 문제 수</div>
+                            <div class="text-2xl font-black text-amber-300">${summary.total_solved.toLocaleString()}<span class="text-xs font-normal text-amber-200 ml-1">문제</span></div>
+                        </div>
+                        <div class="bg-white/5 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
+                            <div class="text-[11px] font-bold text-indigo-300 mb-1">🎯 전체 평균 정답률</div>
+                            <div class="text-2xl font-black text-sky-300">${summary.overall_accuracy}<span class="text-xs font-normal text-sky-200 ml-1">%</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 로그아웃 확인 커스텀 모달 -->
+                <div id="learning-logout-modal" class="learning-custom-modal-overlay" style="display:none;" onclick="LearningEngine.closeLogoutModal(event)">
+                    <div class="learning-custom-modal-content" onclick="event.stopPropagation()">
+                        <div class="modal-emoji-badge">🚪</div>
+                        <h3 class="text-base font-extrabold text-slate-900 mt-2">관리자 모드에서 로그아웃할까요?</h3>
+                        <div class="flex gap-2.5 justify-center mt-5">
+                            <button class="btn-custom-modal-cancel" onclick="LearningEngine.closeLogoutModal()">취소</button>
+                            <button class="btn-custom-modal-danger" onclick="LearningEngine.confirmLogout()">로그아웃</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 학습자 상세 진도 팝업 모달 영역 -->
+                <div id="admin-user-detail-modal" class="learning-custom-modal-overlay" style="display:none;" onclick="LearningEngine.closeAdminUserDetailModal(event)">
+                    <div class="learning-custom-modal-content max-w-2xl text-left bg-white p-6 sm:p-7 rounded-3xl" onclick="event.stopPropagation()">
+                        <div id="admin-user-detail-content"></div>
+                    </div>
+                </div>
+
+                <!-- 학습자 현황 목록 테이블 -->
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
+                        <div>
+                            <h3 class="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                                <span>📋</span> 학습자별 진도 및 활동 현황
+                            </h3>
+                            <p class="text-xs text-slate-400 mt-0.5">총 ${users.length}명의 학습자가 등록되어 있습니다.</p>
+                        </div>
+                        <div>
+                            <input type="text" id="admin-user-search-input" placeholder="학습자 이름 검색..." 
+                                class="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-60"
+                                oninput="LearningEngine.filterAdminUserList()">
+                        </div>
+                    </div>
+
+                    ${users.length === 0 ? `
+                        <div class="py-12 text-center text-slate-400 font-bold text-sm">
+                            가입된 학습자가 아직 없습니다.
+                        </div>
+                    ` : `
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 text-[11px] font-extrabold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
+                                        <th class="py-3 px-4">학습자명</th>
+                                        <th class="py-3 px-3">가입일 / 최근접속</th>
+                                        <th class="py-3 px-4 w-48">8대 단원 진도율</th>
+                                        <th class="py-3 px-3 text-center">완료 단원</th>
+                                        <th class="py-3 px-3 text-center">문제 풀이</th>
+                                        <th class="py-3 px-3 text-center">오답노트</th>
+                                        <th class="py-3 px-3 text-right">상세조회</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="admin-user-table-body" class="divide-y divide-slate-100 text-xs">
+                                    ${users.map((u, idx) => `
+                                        <tr class="hover:bg-indigo-50/30 transition admin-user-row" data-name="${escapeHtml(u.username).toLowerCase()}">
+                                            <td class="py-3.5 px-4 font-black text-slate-900 flex items-center gap-2">
+                                                <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 text-xs font-black flex items-center justify-center">${escapeHtml(u.username.substring(0, 1))}</span>
+                                                <span>${escapeHtml(u.username)}</span>
+                                            </td>
+                                            <td class="py-3.5 px-3 text-slate-500 font-mono text-[11px]">
+                                                <div>${escapeHtml(u.created_at ? u.created_at.substring(0, 10) : '-')}</div>
+                                                <div class="text-[10px] text-slate-400">${escapeHtml(u.last_login ? u.last_login.substring(11, 16) : '미접속')}</div>
+                                            </td>
+                                            <td class="py-3.5 px-4">
+                                                <div class="flex justify-between items-center text-[11px] font-bold mb-1">
+                                                    <span class="text-indigo-600 font-black">${u.total_pct}%</span>
+                                                    <span class="text-[10px] text-slate-400">${u.total_pct === 100 ? '완강 🎉' : (u.total_pct > 0 ? '학습중' : '시작전')}</span>
+                                                </div>
+                                                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                                                    <div class="h-2 rounded-full transition-all duration-300 ${u.total_pct >= 80 ? 'bg-emerald-500' : (u.total_pct >= 40 ? 'bg-indigo-500' : 'bg-amber-500')}" style="width: ${u.total_pct}%"></div>
+                                                </div>
+                                            </td>
+                                            <td class="py-3.5 px-3 text-center font-bold">
+                                                <span class="px-2 py-0.5 rounded-full text-[11px] ${u.completed_sections > 0 ? 'bg-emerald-100 text-emerald-700 font-extrabold' : 'bg-slate-100 text-slate-500'}">
+                                                    ${u.completed_sections} / 8
+                                                </span>
+                                            </td>
+                                            <td class="py-3.5 px-3 text-center">
+                                                <span class="font-bold text-slate-800 font-mono">${u.solved_count}회</span>
+                                                ${u.solved_count > 0 ? `<div class="text-[10px] text-emerald-600 font-bold">정답률 ${u.accuracy}%</div>` : ''}
+                                            </td>
+                                            <td class="py-3.5 px-3 text-center">
+                                                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${u.unresolved_wrong_count > 0 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-400'}">
+                                                    ${u.unresolved_wrong_count > 0 ? `미해결 ${u.unresolved_wrong_count}개` : '없음'}
+                                                </span>
+                                            </td>
+                                            <td class="py-3.5 px-3 text-right">
+                                                <button onclick="LearningEngine.openAdminUserDetailModal(${idx})" class="px-2.5 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 rounded-lg text-xs font-bold transition shadow-2xs">
+                                                    단원별 상세 ➜
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `}
+                </div>
+            </div>
+        `;
+    }
+
+    function filterAdminUserList() {
+        const inp = document.getElementById('admin-user-search-input');
+        if (!inp) return;
+        const q = inp.value.trim().toLowerCase();
+        const rows = document.querySelectorAll('.admin-user-row');
+        rows.forEach(r => {
+            const name = r.getAttribute('data-name') || '';
+            if (name.includes(q)) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+    }
+
+    function openAdminUserDetailModal(userIndex) {
+        if (!adminStatsData || !adminStatsData.users || !adminStatsData.users[userIndex]) return;
+        const u = adminStatsData.users[userIndex];
+        const modal = document.getElementById('admin-user-detail-modal');
+        const content = document.getElementById('admin-user-detail-content');
+        if (!modal || !content) return;
+
+        const curriculum = window.LearningCurriculum;
+
+        content.innerHTML = `
+            <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-2xl bg-indigo-100 text-indigo-700 font-black text-sm flex items-center justify-center">
+                        ${escapeHtml(u.username.substring(0, 1))}
+                    </span>
+                    <div>
+                        <h3 class="text-base font-extrabold text-slate-900">${escapeHtml(u.username)}님의 단원별 학습 상세</h3>
+                        <p class="text-xs text-slate-400">전체 달성률: <strong>${u.total_pct}%</strong> (완료 ${u.completed_sections}/8단원)</p>
+                    </div>
+                </div>
+                <button onclick="LearningEngine.closeAdminUserDetailModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 font-bold flex items-center justify-center">
+                    ✕
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+                ${curriculum.sections.map(sec => {
+                    const d = (u.section_details && u.section_details[sec.id]) || { pct: 0, is_complete: false, theory_count: 0, journal_count: 0 };
+                    return `
+                        <div class="p-3.5 rounded-2xl border ${d.is_complete ? 'bg-emerald-50/40 border-emerald-200' : 'bg-slate-50/60 border-slate-200/80'} shadow-2xs">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-black text-slate-800">${escapeHtml(sec.title)}</span>
+                                ${d.is_complete ? '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-full">완료 ✨</span>' : `<span class="text-xs font-extrabold text-indigo-600">${d.pct}%</span>`}
+                            </div>
+                            <div class="w-full bg-slate-200/80 rounded-full h-1.5 overflow-hidden mb-2">
+                                <div class="h-1.5 rounded-full ${d.is_complete ? 'bg-emerald-500' : 'bg-indigo-500'}" style="width: ${d.pct}%"></div>
+                            </div>
+                            <div class="flex justify-between text-[11px] text-slate-500 font-medium">
+                                <span>📝 필기: <strong>${d.theory_count}회 정답</strong></span>
+                                ${sec.id === 'sec_account_master' ? '<span>⚡ 3초 판별 전용</span>' : `<span>🧾 분개: <strong>${d.journal_count}회 정답</strong></span>`}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+
+            <div class="mt-5 pt-4 border-t border-slate-100 flex justify-end">
+                <button onclick="LearningEngine.closeAdminUserDetailModal()" class="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shadow-sm">
+                    닫기
+                </button>
+            </div>
+        `;
+
+        modal.style.display = 'flex';
+    }
+
+    function closeAdminUserDetailModal(event) {
+        if (event && event.target && event.target !== document.getElementById('admin-user-detail-modal')) return;
+        const modal = document.getElementById('admin-user-detail-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
     // --- 2. 학습자 대시보드 화면 ---
     function renderDashboard() {
         const container = document.getElementById('learning-content-container');
         if (!container) return;
 
         const user = window.LearningAuth.getUser();
+        if (user && user.is_admin) {
+            renderAdminDashboard();
+            return;
+        }
+
         const prog = window.LearningAuth.getProgress() || {};
         const curriculum = window.LearningCurriculum;
 
@@ -2239,6 +2516,11 @@ window.LearningEngine = (function() {
         submitExtraTheoryQuiz,
         submitExtraJournalQuiz,
         
-        showSectionCompleteModal
+        showSectionCompleteModal,
+
+        renderAdminDashboard,
+        filterAdminUserList,
+        openAdminUserDetailModal,
+        closeAdminUserDetailModal
     };
 })();
