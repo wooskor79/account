@@ -748,7 +748,7 @@ window.VideoEngine = (function() {
     }
 
     // --- 비디오 플레이어 모달 제어 ---
-    function playVideo(encodedPath, encodedName) {
+    async function playVideo(encodedPath, encodedName) {
         const path = decodeURIComponent(encodedPath);
         const name = encodedName ? decodeURIComponent(encodedName) : path.split('/').pop();
         const vKey = getVideoKey(currentGrade, path);
@@ -819,6 +819,23 @@ window.VideoEngine = (function() {
         // 북마크 리스트 렌더링
         renderBookmarkList(prog.bookmarks || []);
 
+        // 최근 시청 위젯 등에서 재생 시, 해당 영상이 속한 폴더의 전체 강의 목록 자동 로드
+        const parentFolder = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+        const hasCurrentItems = currentItems.some(it => it.path === path && it.type === 'file');
+        
+        if (!hasCurrentItems) {
+            try {
+                const res = await fetch(`?action=videos&grade=${encodeURIComponent(currentGrade)}&path=${encodeURIComponent(parentFolder)}`);
+                const data = await res.json();
+                if (data && data.items) {
+                    currentPath = data.current_path || parentFolder;
+                    currentItems = data.items || [];
+                }
+            } catch(e) {
+                console.warn('재생목록 자동 동기화 오류:', e);
+            }
+        }
+
         // 같은 폴더 내 다음 강의 목록 렌더링
         renderNextPlaylist(path);
 
@@ -844,9 +861,9 @@ window.VideoEngine = (function() {
         };
     }
 
-    function playVideoFromRecent(encodedPath) {
+    async function playVideoFromRecent(encodedPath) {
         const path = decodeURIComponent(encodedPath);
-        playVideo(encodedPath, encodeURIComponent(path.split('/').pop()));
+        await playVideo(encodedPath, encodeURIComponent(path.split('/').pop()));
     }
 
     function resumePlayback(seconds) {
