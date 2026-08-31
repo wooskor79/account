@@ -713,6 +713,75 @@ function cancelPaste() {
     pastedImageData = null;
 }
 
+async function savePastedImage() {
+    if (!pastedImageData) {
+        alert('저장할 이미지 데이터가 없습니다.');
+        return;
+    }
+
+    const filenameInput = document.getElementById('paste-filename');
+    let filename = filenameInput ? filenameInput.value.trim() : '';
+
+    if (!filename) {
+        alert('저장할 파일명을 입력해주세요.');
+        if (filenameInput) filenameInput.focus();
+        return;
+    }
+
+    // 파일명에 이미지 확장자가 없으면 기본으로 .png 추가
+    if (!/\.(png|jpe?g|gif|webp|bmp)$/i.test(filename)) {
+        filename += '.png';
+    }
+
+    const saveBtn = document.querySelector('#paste-modal .btn-save');
+    const origBtnText = saveBtn ? saveBtn.textContent : '저장';
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = '저장 중...';
+    }
+
+    try {
+        // Base64 DataURL -> Blob 변환
+        const parts = pastedImageData.split(',');
+        const mime = (parts[0].match(/:(.*?);/) || [])[1] || 'image/png';
+        const byteString = atob(parts[1]);
+        const arrayBuffer = new ArrayBuffer(byteString.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < byteString.length; i++) {
+            uint8Array[i] = byteString.charCodeAt(i);
+        }
+        const blob = new Blob([uint8Array], { type: mime });
+
+        const formData = new FormData();
+        formData.append('file', blob, filename);
+        formData.append('filename', filename);
+        formData.append('category', 'drawing');
+        formData.append('chunk_index', '0');
+        formData.append('total_chunks', '1');
+
+        const res = await fetch(`?action=upload&grade=${currentGrade}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+            cancelPaste();
+            await fetchFiles();
+        } else {
+            alert('이미지 저장 실패: ' + (data.error || '서버 오류'));
+        }
+    } catch (err) {
+        console.error('savePastedImage error:', err);
+        alert('이미지 저장 중 오류가 발생했습니다: ' + err.message);
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = origBtnText;
+        }
+    }
+}
+
 // --- 1급 맞춤 코스 학습 (Learning Course) 뷰 전환 라우팅 ---
 function openLearningCourseApp() { console.log('openLearningCourseApp called'); console.log('mainView, quizView, learningView elements:', document.getElementById('main-content-view'), document.getElementById('quiz-content-view'), document.getElementById('learning-course-view'));
     const mainView = document.getElementById('main-content-view');

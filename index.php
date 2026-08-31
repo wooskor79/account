@@ -782,7 +782,7 @@ $show_lock_gate = $is_private && !$is_admin;
         <div class="paste-modal-content">
             <h3>이미지 저장</h3>
             <img id="paste-preview" class="paste-preview" src="">
-            <input type="text" id="paste-filename" placeholder="저장할 파일명 입력 (예: 회계노트1)">
+            <input type="text" id="paste-filename" placeholder="저장할 파일명 입력 (예: 회계노트1)" onkeydown="if(event.key==='Enter') savePastedImage()">
             <div class="paste-modal-actions">
                 <button class="btn-cancel" onclick="cancelPaste()">취소</button>
                 <button class="btn-save" onclick="savePastedImage()">저장</button>
