@@ -2149,3 +2149,157 @@ body.learning-app-active {
 .btn-note-delete:hover {
     background: #fca5a5;
 }
+
+/* =========================================================================
+   영상 강의실 (Video Course) & 스마트 비디오 플레이어 모달 스타일
+   ========================================================================= */
+body.video-app-active {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+}
+
+#video-course-view {
+    animation: fadeInVideoView 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInVideoView {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.video-folder-card {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.video-folder-card:hover {
+    transform: translateY(-2px);
+}
+
+.video-item-card {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.video-item-card:hover {
+    transform: translateY(-3px);
+}
+
+/* 비디오 모달 컨테이너 */
+.video-modal-container {
+    animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+#video-main-player::-webkit-media-controls-panel {
+    background-image: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+}
+
+/* 빵가루 바 */
+.breadcrumb-item {
+    transition: color 0.15s ease;
+}
+
+/* 단축키 kbd */
+kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.7rem;
+    letter-spacing: -0.2px;
+}
+
+/* 속도 셀렉트 박스 다크 테마 (글씨 흰색 바탕 문제 방지) */
+#video-speed-select {
+    background-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+#video-speed-select option {
+    background-color: #0f172a !important;
+    color: #f8fafc !important;
+    padding: 6px 10px;
+}
+
+/* 스마트 비디오 플레이어 모달 오버레이 최상위 레이어 */
+#video-player-modal {
+    z-index: 1000005 !important;
+    padding: 12px;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.video-modal-container {
+    position: relative;
+    user-select: auto;
+    transition: transform 0.05s ease-out, box-shadow 0.2s ease;
+    touch-action: none;
+    min-width: 320px;
+}
+
+.video-modal-header {
+    cursor: grab;
+    touch-action: none;
+}
+.video-modal-header:active,
+.video-modal-header.is-dragging {
+    cursor: grabbing !important;
+}
+
+/* 우측 하단 리사이즈 핸들 */
+.video-modal-resizer {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    width: 20px;
+    height: 20px;
+    cursor: se-resize;
+    z-index: 50;
+    opacity: 0.6;
+    transition: opacity 0.2s, transform 0.2s;
+    touch-action: none;
+}
+.video-modal-resizer:hover {
+    opacity: 1;
+    transform: scale(1.15);
+}
+.video-modal-resizer::after {
+    content: '';
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 8px;
+    height: 8px;
+    border-right: 2.5px solid #94a3b8;
+    border-bottom: 2.5px solid #94a3b8;
+    border-radius: 1px;
+}
+
+/* 우측 사이드바 숨김 시 전폭 확장 */
+.video-modal-body.sidebar-collapsed #video-player-col {
+    grid-column: span 4 / span 4 !important;
+    width: 100% !important;
+}
+.video-modal-body.sidebar-collapsed #video-sidebar-col {
+    display: none !important;
+}
+
+/* 극장 모드 (Theater Mode) */
+.video-modal-container.theater-mode {
+    max-width: 96vw !important;
+    width: 96vw !important;
+    max-height: 96vh !important;
+    height: 96vh !important;
+    transform: none !important; /* 드래그 위치 초기화 */
+    top: auto !important;
+    left: auto !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.video-modal-container.theater-mode #video-main-player {
+    max-height: 82vh !important;
+}
+
+/* 영상 로그인 게이트 모달 */
+.video-gate-container {
+    animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}

@@ -262,7 +262,7 @@ $show_lock_gate = $is_private && !$is_admin;
                 <div class="relative inline-block z-[1001]" id="quiz-dropdown-wrapper">
                     <!-- 급수에 따라 텍스트 및 색상이 동적 변경되는 단일 문제풀이 버튼 -->
                     <span id="quiz-menu-btn" onclick="toggleQuizMenu()" style="color: var(--accounting-point); font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; font-size:1.05rem;">
-                        ✨ 2급문제풀이 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        ✨ <span id="quiz-menu-text">2급문제풀이</span> <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </span>
 
                     <div id="quiz-menu-dropdown" class="hidden absolute right-0 left-auto mt-3 w-64 max-w-[calc(100vw-32px)] bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-[99999]">
@@ -309,6 +309,22 @@ $show_lock_gate = $is_private && !$is_admin;
                                 📖 6. 1급 전산회계 기출 필기
                             </a>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 영상보기 드롭다운 (1급/2급 영상 강의실) -->
+                <div class="relative inline-block z-[1001] ml-4" id="video-dropdown-wrapper">
+                    <span id="video-menu-btn" onclick="toggleVideoMenu()" style="color: #6366f1; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:4px; font-size:1.05rem;" title="전산회계 영상 강의실">
+                        🎬 <span id="video-btn-text">2급영상보기</span> <svg class="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </span>
+
+                    <div id="video-menu-dropdown" class="hidden absolute right-0 left-auto mt-3 w-64 max-w-[calc(100vw-32px)] bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-[99999]">
+                        <a onclick="openVideoAppView('grade1')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 cursor-pointer border-b border-slate-100 flex items-center gap-2">
+                            <span>🎓</span> <span>1. 1급 전산회계 영상 강의실</span>
+                        </a>
+                        <a onclick="openVideoAppView('grade2')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer flex items-center gap-2">
+                            <span>📘</span> <span>2. 2급 전산회계 영상 강의실</span>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -727,6 +743,298 @@ $show_lock_gate = $is_private && !$is_admin;
         <div id="learning-content-container"></div>
     </div>
 
+    <!-- 1급 / 2급 전산회계 영상 강의실 (Video Course) 전용 뷰 -->
+    <div id="video-course-view" class="hidden max-w-7xl mx-auto px-3 sm:px-6 py-4">
+        <div id="video-content-container"></div>
+    </div>
+
+    <!-- 스마트 비디오 모달 플레이어 -->
+    <div id="video-player-modal" class="modal-overlay" style="display:none;" onclick="VideoEngine.closeVideoPlayerModal(event)">
+        <div class="video-modal-container max-w-5xl w-full mx-4 bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-700/80 flex flex-col max-h-[92vh] relative" id="video-modal-container" onclick="event.stopPropagation()">
+            
+            <!-- 플레이어 헤더 (드래그 핸들 및 더블클릭 최대화) -->
+            <div class="video-modal-header px-5 py-3.5 bg-slate-950 flex items-center justify-between gap-3 border-b border-slate-800 shrink-0 cursor-move select-none" id="video-modal-header" ondblclick="VideoEngine.toggleTheaterMode()" title="헤더를 드래그하여 창 이동 / 더블클릭하여 화면 크기 토글">
+                <div class="flex items-center gap-2.5 min-w-0 pointer-events-none">
+                    <span class="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-sm font-bold shrink-0">🎬</span>
+                    <h3 id="video-modal-title" class="text-sm sm:text-base font-extrabold text-white truncate">강의 동영상</h3>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <!-- 배속 선택 -->
+                    <div class="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-xl text-xs font-bold text-slate-300 border border-slate-700">
+                        <span>⚡</span>
+                        <select id="video-speed-select" onchange="VideoEngine.changePlaybackSpeed(this.value)" class="bg-transparent text-white outline-none cursor-pointer font-mono text-xs" style="color:#ffffff; background:#1e293b;">
+                            <option value="0.75" style="background:#0f172a; color:#ffffff;">0.75x</option>
+                            <option value="1" selected style="background:#0f172a; color:#ffffff;">1.0x (기본)</option>
+                            <option value="1.25" style="background:#0f172a; color:#ffffff;">1.25x</option>
+                            <option value="1.5" style="background:#0f172a; color:#ffffff;">1.5x</option>
+                            <option value="1.75" style="background:#0f172a; color:#ffffff;">1.75x</option>
+                            <option value="2" style="background:#0f172a; color:#ffffff;">2.0x</option>
+                        </select>
+                    </div>
+
+                    <!-- 우측 재생목록/북마크 토글 버튼 -->
+                    <button id="btn-video-sidebar-toggle" onclick="VideoEngine.toggleSidebar()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1" title="우측 재생목록/북마크 사이드바 숨기기/보기">
+                        <span>📋</span> <span id="sidebar-toggle-text" class="hidden sm:inline">목록숨기기</span>
+                    </button>
+
+                    <!-- 극장 모드 (크기 조절) 버튼 -->
+                    <button id="btn-video-theater-toggle" onclick="VideoEngine.toggleTheaterMode()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1" title="화면 크기 조절 (기본 / 대형 극장 모드)">
+                        <span>📐</span> <span id="theater-mode-text" class="hidden sm:inline">극장모드</span>
+                    </button>
+
+                    <!-- PiP (화면 속 화면) 버튼 -->
+                    <button onclick="VideoEngine.togglePiP()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-1" title="화면 속 화면(PiP) 띄우기">
+                        <span>🖼️</span> <span class="hidden sm:inline">PiP</span>
+                    </button>
+
+                    <!-- 모달 닫기 버튼 -->
+                    <button class="btn-video-modal-close w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition" onclick="VideoEngine.closeVideoPlayerModal()" title="닫기 (ESC)">
+                        &times;
+                    </button>
+                </div>
+            </div>
+
+            <!-- 이어보기 / 다음강의 알림 배너 -->
+            <div id="video-resume-banner" class="hidden p-3 bg-slate-950/90 shrink-0"></div>
+
+            <!-- 모달 바디: 비디오 플레이어 & 사이드바 -->
+            <div id="video-modal-body" class="video-modal-body grid grid-cols-1 lg:grid-cols-4 flex-1 overflow-hidden bg-black relative">
+                <!-- 메인 비디오 플레이어 영역 (3열 또는 전폭) -->
+                <div id="video-player-col" class="lg:col-span-3 flex flex-col justify-center items-center bg-black relative min-h-[280px] sm:min-h-[420px] transition-all">
+                    <video id="video-main-player" class="w-full h-full max-h-[62vh] object-contain" controls playsinline preload="metadata"></video>
+                </div>
+
+                <!-- 사이드바 영역 (1열: 북마크 & 다음강의) -->
+                <div id="video-sidebar-col" class="lg:col-span-1 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col max-h-[220px] lg:max-h-[62vh] transition-all">
+                    <!-- 북마크 추가 입력바 -->
+                    <div class="p-3 border-b border-slate-800 shrink-0">
+                        <div class="text-[11px] font-bold text-slate-400 mb-1.5 flex items-center justify-between">
+                            <span>📌 현재 시점 북마크 메모</span>
+                        </div>
+                        <div class="flex gap-1.5">
+                            <input type="text" id="video-bookmark-input" placeholder="중요 내용 메모..." class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1 text-xs text-white outline-none focus:border-indigo-500" onkeydown="if(event.key==='Enter') VideoEngine.addBookmark()">
+                            <button onclick="VideoEngine.addBookmark()" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shrink-0">
+                                추가
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 탭 컨텐츠 영역 -->
+                    <div class="flex-1 overflow-y-auto p-3 space-y-4">
+                        <!-- 1. 북마크 목록 -->
+                        <div>
+                            <div class="text-[11px] font-extrabold text-slate-400 mb-1.5 uppercase tracking-wider">북마크 타임태그</div>
+                            <div id="video-bookmark-list" class="space-y-1.5"></div>
+                        </div>
+
+                        <!-- 2. 다음 강의 목록 -->
+                        <div>
+                            <div class="text-[11px] font-extrabold text-slate-400 mb-1.5 uppercase tracking-wider">단원 강의 목록</div>
+                            <div id="video-next-playlist" class="space-y-1.5"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 하단 단축키 안내 바 -->
+            <div class="px-4 py-2 bg-slate-950 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between flex-wrap gap-2 shrink-0">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">Space</kbd> 재생/정지</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">←/→</kbd> 10초 이동</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">F</kbd> 전체화면</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">M</kbd> 음소거</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">ESC</kbd> 닫기</span>
+                </div>
+                <div class="text-slate-500 text-[10px]">
+                    ※ 시청 진도(이어보기 및 완료)가 자동 동기화됩니다.
+                </div>
+            </div>
+
+            <!-- 우측 하단 리사이즈 핸들 -->
+            <div id="video-modal-resizer" class="video-modal-resizer" title="드래그하여 창 크기 자유 조절"></div>
+        </div>
+    </div>
+
+    <!-- 영상 학습 로그인 / 회원가입 게이트 모달 (맞춤학습 디자인 시스템 통일) -->
+    <div id="video-login-gate-modal" class="modal-overlay" style="display:none;" onclick="VideoEngine.closeLoginGateModal(event)">
+        <div class="learning-auth-card relative shadow-2xl" id="video-gate-container" onclick="event.stopPropagation()">
+            
+            <button class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition text-sm font-bold" onclick="VideoEngine.closeLoginGateModal()" title="닫기">
+                &times;
+            </button>
+
+            <div class="learning-auth-header">
+                <div class="auth-icon-badge">🎬</div>
+                <h2 class="text-xl font-extrabold text-slate-900 mt-2" id="video-gate-title">2026 전산회계 영상 강의실</h2>
+                <p class="text-xs text-slate-500 font-medium mt-1">교재 기반 고화질 강의 & 시청 진도 자동 저장</p>
+            </div>
+
+            <!-- 탭 전환 -->
+            <div class="auth-tabs">
+                <button id="video-tab-btn-login" class="auth-tab-btn active" onclick="VideoEngine.switchGateTab('login')">
+                    로그인
+                </button>
+                <button id="video-tab-btn-register" class="auth-tab-btn" onclick="VideoEngine.switchGateTab('register')">
+                    간편 회원가입 (3초)
+                </button>
+            </div>
+
+            <!-- 1. 최상단: 비회원 즉시 학습 시작하기 버튼 (아이디 입력창 위 배치) -->
+            <div class="mb-4">
+                <button onclick="VideoEngine.continueWithoutLogin()" class="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-sm rounded-2xl shadow-md hover:shadow-lg transition transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer border border-emerald-400/30">
+                    <span class="text-lg">👤</span>
+                    <span class="tracking-tight">비회원으로 학습 시작하기 ➜</span>
+                </button>
+                <p class="text-[11px] text-slate-400 text-center mt-1.5 font-medium">
+                    ※ 로그인 없이 즉시 시청하며 현재 브라우저에 이어보기가 저장됩니다.
+                </p>
+            </div>
+
+            <div class="flex items-center my-4">
+                <div class="flex-1 border-t border-slate-200"></div>
+                <span class="px-3 text-[11px] font-bold text-slate-400">또는 계정으로 로그인</span>
+                <div class="flex-1 border-t border-slate-200"></div>
+            </div>
+
+            <!-- 로그인 폼 -->
+            <div id="video-gate-login-form" class="auth-form-body">
+                <div class="form-group">
+                    <label class="form-label">학습자 이름(아이디)</label>
+                    <input type="text" id="video-login-username" class="form-input" placeholder="이름을 입력하세요 (예: 홍길동)" onkeypress="if(event.key==='Enter') VideoEngine.submitGateLogin()">
+                </div>
+                <div class="form-group mt-3">
+                    <label class="form-label">비밀번호</label>
+                    <input type="password" id="video-login-password" class="form-input" placeholder="비밀번호를 입력하세요 (숫자 4자리 이상)" onkeypress="if(event.key==='Enter') VideoEngine.submitGateLogin()">
+                </div>
+                <div id="video-login-error" class="auth-error-msg hidden"></div>
+                <button id="btn-video-submit-login" class="btn-auth-submit mt-5" onclick="VideoEngine.submitGateLogin()">
+                    학습 시작하기 ➜
+                </button>
+                <div class="text-center mt-3">
+                    <span class="text-xs text-slate-400">처음이신가요? </span>
+                    <a href="javascript:void(0)" class="text-xs font-bold text-blue-600 hover:underline" onclick="VideoEngine.switchGateTab('register')">간편 회원가입하기</a>
+                </div>
+            </div>
+
+            <!-- 회원가입 폼 -->
+            <div id="video-gate-register-form" class="auth-form-body hidden">
+                <div class="form-group">
+                    <label class="form-label">학습자 이름(아이디)</label>
+                    <input type="text" id="video-reg-username" class="form-input" placeholder="사용할 이름을 입력하세요 (예: 홍길동)">
+                </div>
+                <div class="form-group mt-3">
+                    <label class="form-label">비밀번호 (숫자 4자리 이상)</label>
+                    <input type="password" id="video-reg-password" class="form-input" placeholder="비밀번호 (숫자 4자리 이상, 영문 불필요)">
+                </div>
+                <div class="form-group mt-3">
+                    <label class="form-label">비밀번호 확인</label>
+                    <input type="password" id="video-reg-password-confirm" class="form-input" placeholder="비밀번호를 한번 더 입력하세요" onkeypress="if(event.key==='Enter') VideoEngine.submitGateRegister()">
+                </div>
+                <div class="text-[11px] text-slate-400 mt-2 bg-slate-50 p-2.5 rounded-lg border border-slate-100 leading-relaxed">
+                    💡 <strong>안내</strong>: 복잡한 영문이나 특수문자 없이 <strong>숫자 4자리</strong>만으로 빠르고 간편하게 가입하실 수 있습니다!
+                </div>
+                <div id="video-reg-error" class="auth-error-msg hidden"></div>
+                <button id="btn-video-submit-register" class="btn-auth-submit mt-4" onclick="VideoEngine.submitGateRegister()">
+                    회원가입 완료 및 입장 ➜
+                </button>
+                <div class="text-center mt-3">
+                    <span class="text-xs text-slate-400">이미 계정이 있으신가요? </span>
+                    <a href="javascript:void(0)" class="text-xs font-bold text-blue-600 hover:underline" onclick="VideoEngine.switchGateTab('login')">로그인하기</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 회원관리 & 학습/영상 시청 통합 관리자 모달 -->
+    <div id="member-admin-modal" class="modal-overlay" style="display:none;" onclick="closeMemberAdminModal(event)">
+        <div class="max-w-6xl w-full mx-4 bg-slate-900 text-slate-100 rounded-3xl shadow-2xl overflow-hidden border border-slate-700/80 flex flex-col max-h-[92vh]" id="member-admin-container" onclick="event.stopPropagation()">
+            
+            <!-- 헤더 -->
+            <div class="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xl shadow-inner shrink-0">
+                        👑
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-base sm:text-lg font-black text-white">전체 회원 및 학습/영상 관리 센터</h3>
+                            <span class="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-[10px] font-extrabold rounded-full border border-indigo-400/30">ADMIN</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-0.5">등록된 모든 회원의 맞춤학습 진도, 문제 풀이 현황 및 영상 시청 기록을 실시간 모니터링합니다.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <button onclick="fetchAndRenderMemberAdmin()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl text-xs border border-slate-700 transition flex items-center gap-1">
+                        <span>🔄</span> <span>새로고침</span>
+                    </button>
+                    <button class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition font-bold" onclick="closeMemberAdminModal()">
+                        &times;
+                    </button>
+                </div>
+            </div>
+
+            <!-- 탭 전환 및 검색 바 -->
+            <div class="px-6 py-3 bg-slate-900/90 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+                <div class="flex items-center gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-bold">
+                    <button id="admin-tab-btn-overview" class="px-3.5 py-1.5 rounded-lg transition bg-indigo-600 text-white shadow-xs" onclick="switchMemberAdminTab('overview')">
+                        📊 학습자별 종합 현황
+                    </button>
+                    <button id="admin-tab-btn-videos" class="px-3.5 py-1.5 rounded-lg transition text-slate-400 hover:text-white" onclick="switchMemberAdminTab('videos')">
+                        🎬 영상 시청 상세 기록
+                    </button>
+                </div>
+
+                <div class="relative w-full sm:w-64">
+                    <input type="text" id="member-admin-search" placeholder="회원 이름 검색..." 
+                           class="w-full px-3 py-1.5 pl-8 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white outline-none focus:border-indigo-500 transition"
+                           oninput="filterMemberAdminList(this.value)">
+                    <span class="absolute left-2.5 top-2 text-slate-500 text-xs">🔍</span>
+                </div>
+            </div>
+
+            <!-- 모달 바디 (스크롤 영역) -->
+            <div class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6" id="member-admin-body">
+                <div class="py-16 text-center text-slate-400">
+                    <div class="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                    <p class="font-bold text-xs">회원 현황 데이터를 불러오는 중입니다...</p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 회원 개별 맞춤학습 & 오답노트 & 영상 시청 상세 모달 -->
+    <div id="member-detail-modal" class="modal-overlay z-[100000]" style="display:none;" onclick="closeUserDetailPopup(event)">
+        <div class="max-w-4xl w-full mx-4 bg-slate-900 text-slate-100 rounded-3xl shadow-2xl overflow-hidden border border-slate-700 flex flex-col max-h-[90vh]" id="member-detail-container" onclick="event.stopPropagation()">
+            <div class="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-3 shrink-0" id="member-detail-header">
+                <!-- 동적 헤더 -->
+            </div>
+            <!-- 상세 서브 탭 바 -->
+            <div class="px-6 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center gap-2 shrink-0">
+                <button id="user-subtab-btn-sections" class="px-3 py-1.5 rounded-xl text-xs font-bold transition bg-indigo-600 text-white" onclick="switchUserDetailSubTab('sections')">
+                    📊 9대 단원별 진도
+                </button>
+                <button id="user-subtab-btn-wrong" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white" onclick="switchUserDetailSubTab('wrong')">
+                    🚨 오답노트 상세
+                </button>
+                <button id="user-subtab-btn-videos" class="px-3 py-1.5 rounded-xl text-xs font-bold transition text-slate-400 hover:text-white" onclick="switchUserDetailSubTab('videos')">
+                    🎬 영상 시청 상세
+                </button>
+            </div>
+            <!-- 상세 컨텐츠 바디 -->
+            <div class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4" id="member-detail-body">
+            </div>
+            <div class="px-6 py-3 bg-slate-950 border-t border-slate-800 flex justify-end shrink-0">
+                <button onclick="closeUserDetailPopup()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 통합 문서 & 그림 미리보기 모달 (PDF, XLSX, HWP/HWPX, IMAGE) -->
     <div id="doc-preview-modal" class="modal-overlay" style="display:none;" onclick="closePreviewModal(event)">
         <div class="doc-modal-content" id="doc-modal-content" onclick="event.stopPropagation()">
@@ -804,6 +1112,7 @@ $show_lock_gate = $is_private && !$is_admin;
     <script src="js/learning/learning_wrong_notes.js?v=<?php echo time(); ?>"></script>
     <script src="js/learning/learning_generator.js?v=<?php echo time(); ?>"></script>
     <script src="js/learning/learning_engine.js?v=<?php echo time(); ?>"></script>
+    <script src="js/video_engine.js?v=<?php echo time(); ?>"></script>
     <script src="js/main.js?v=<?php echo time(); ?>"></script>
 </body>
 </html>
