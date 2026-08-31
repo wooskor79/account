@@ -53,32 +53,46 @@ window.VideoEngine = (function() {
         return `${grade}_${path}`.replace(/[^a-zA-Z0-9_\-\.\/]/g, '_');
     }
 
-    // --- 진도 동기화 (서버 + LocalStorage) ---
+    function getStorageUserKey() {
+        const user = (window.LearningAuth && typeof window.LearningAuth.getUser === 'function') ? window.LearningAuth.getUser() : null;
+        if (user && user.username) {
+            return `user_${encodeURIComponent(user.username)}`;
+        }
+        return 'guest';
+    }
+
+    // --- 진도 동기화 (서버 + LocalStorage 사용자별 격리) ---
     async function loadProgress() {
-        // 1. 로컬스토리지 우선 로드
+        videoProgress = {}; // 이전 사용자 메모리 초기화
+        const userKey = getStorageUserKey();
+
+        // 1. 해당 사용자의 로컬스토리지 우선 로드
         try {
-            const localData = localStorage.getItem(`video_progress_${currentGrade}`);
+            const localData = localStorage.getItem(`video_progress_${currentGrade}_${userKey}`);
             if (localData) {
                 videoProgress = Object.assign(videoProgress, JSON.parse(localData));
             }
         } catch(e) {}
 
-        // 2. 서버 진도 동기화 (로그인 상태인 경우)
-        try {
-            const res = await fetch('?action=get_video_progress');
-            const data = await res.json();
-            if (data.success && data.video_progress) {
-                videoProgress = Object.assign(videoProgress, data.video_progress);
-                localStorage.setItem(`video_progress_${currentGrade}`, JSON.stringify(videoProgress));
+        // 2. 서버 진도 동기화 (로그인 회원인 경우만)
+        if (userKey !== 'guest') {
+            try {
+                const res = await fetch('?action=get_video_progress');
+                const data = await res.json();
+                if (data.success && data.video_progress) {
+                    videoProgress = Object.assign(videoProgress, data.video_progress);
+                    localStorage.setItem(`video_progress_${currentGrade}_${userKey}`, JSON.stringify(videoProgress));
+                }
+            } catch(e) {
+                console.warn('영상 진도 서버 로드 실패 (로컬 사용):', e);
             }
-        } catch(e) {
-            console.warn('영상 진도 서버 로드 실패 (로컬 사용):', e);
         }
     }
 
     async function saveCurrentProgress(videoPath, pos, dur, isCompleted, bookmarks = null) {
         if (!videoPath) return;
         const vKey = getVideoKey(currentGrade, videoPath);
+        const userKey = getStorageUserKey();
         
         const existing = videoProgress[vKey] || {};
         const bMarks = bookmarks !== null ? bookmarks : (existing.bookmarks || []);
@@ -97,37 +111,43 @@ window.VideoEngine = (function() {
 
         videoProgress[vKey] = record;
 
-        // 최근 시청 목록 갱신
+        // 최근 시청 목록 갱신 (사용자별 격리)
         updateRecentVideos(record);
 
-        // 로컬 저장
+        // 로컬 저장 (사용자별 격리)
         try {
-            localStorage.setItem(`video_progress_${currentGrade}`, JSON.stringify(videoProgress));
+            localStorage.setItem(`video_progress_${currentGrade}_${userKey}`, JSON.stringify(videoProgress));
         } catch(e) {}
 
-        // 서버 비동기 전송
-        try {
-            fetch('?action=save_video_progress', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(record)
-            }).catch(() => {});
-        } catch(e) {}
+        // 서버 비동기 전송 (로그인 회원만)
+        if (userKey !== 'guest') {
+            try {
+                fetch('?action=save_video_progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(record)
+                }).catch(() => {});
+            } catch(e) {}
+        }
     }
 
     function updateRecentVideos(record) {
         try {
-            let recents = JSON.parse(localStorage.getItem('recent_watched_videos') || '[]');
+            const userKey = getStorageUserKey();
+            const storageKey = `recent_watched_videos_${userKey}`;
+            let recents = JSON.parse(localStorage.getItem(storageKey) || '[]');
             recents = recents.filter(r => r.video_key !== record.video_key);
             recents.unshift(record);
             if (recents.length > 5) recents.pop();
-            localStorage.setItem('recent_watched_videos', JSON.stringify(recents));
+            localStorage.setItem(storageKey, JSON.stringify(recents));
         } catch(e) {}
     }
 
     function getRecentVideos() {
         try {
-            return JSON.parse(localStorage.getItem('recent_watched_videos') || '[]');
+            const userKey = getStorageUserKey();
+            const storageKey = `recent_watched_videos_${userKey}`;
+            return JSON.parse(localStorage.getItem(storageKey) || '[]');
         } catch(e) {
             return [];
         }
