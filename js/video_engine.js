@@ -1344,7 +1344,6 @@ window.VideoEngine = (function() {
     // 모듈 초기화
     document.addEventListener('DOMContentLoaded', () => {
         initKeyboardShortcuts();
-        initModalInteractions();
     });
 
     return {
