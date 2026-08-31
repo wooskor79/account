@@ -70,7 +70,7 @@ border: 1px solid rgba(255, 255, 255, 0.9);
 margin-bottom: 12px;
 flex-shrink: 0;
 position: relative;
-z-index: 999999;
+z-index: 40;
 }
 
 .logo-section {
@@ -2221,19 +2221,34 @@ kbd {
 
 /* 스마트 비디오 플레이어 모달 오버레이 최상위 레이어 */
 #video-player-modal {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
     z-index: 1000005 !important;
-    padding: 12px;
+    padding: 16px !important;
+    display: none;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    background: rgba(15, 23, 42, 0.85) !important;
+    backdrop-filter: blur(8px) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
 }
 
 .video-modal-container {
     position: relative;
     user-select: auto;
-    transition: transform 0.05s ease-out, box-shadow 0.2s ease;
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8);
     touch-action: none;
-    min-width: 320px;
+    min-width: 340px;
+    box-sizing: border-box;
 }
 
 .video-modal-header {
@@ -2248,27 +2263,27 @@ kbd {
 /* 우측 하단 리사이즈 핸들 */
 .video-modal-resizer {
     position: absolute;
-    right: 4px;
-    bottom: 4px;
-    width: 20px;
-    height: 20px;
+    right: 3px;
+    bottom: 3px;
+    width: 22px;
+    height: 22px;
     cursor: se-resize;
     z-index: 50;
-    opacity: 0.6;
+    opacity: 0.7;
     transition: opacity 0.2s, transform 0.2s;
     touch-action: none;
 }
 .video-modal-resizer:hover {
     opacity: 1;
-    transform: scale(1.15);
+    transform: scale(1.2);
 }
 .video-modal-resizer::after {
     content: '';
     position: absolute;
-    right: 3px;
-    bottom: 3px;
-    width: 8px;
-    height: 8px;
+    right: 4px;
+    bottom: 4px;
+    width: 10px;
+    height: 10px;
     border-right: 2.5px solid #94a3b8;
     border-bottom: 2.5px solid #94a3b8;
     border-radius: 1px;
@@ -2285,18 +2300,23 @@ kbd {
 
 /* 극장 모드 (Theater Mode) */
 .video-modal-container.theater-mode {
-    max-width: 96vw !important;
-    width: 96vw !important;
-    max-height: 96vh !important;
-    height: 96vh !important;
-    transform: none !important; /* 드래그 위치 초기화 */
-    top: auto !important;
-    left: auto !important;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    max-width: 98vw !important;
+    width: 98vw !important;
+    max-height: calc(100vh - 32px) !important;
+    height: calc(100vh - 32px) !important;
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin: auto !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.video-modal-container.theater-mode .video-modal-body {
+    flex: 1 1 auto !important;
 }
 
 .video-modal-container.theater-mode #video-main-player {
-    max-height: 82vh !important;
+    max-height: calc(100vh - 170px) !important;
 }
 
 /* 영상 로그인 게이트 모달 */

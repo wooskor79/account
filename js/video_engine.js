@@ -921,124 +921,134 @@ window.VideoEngine = (function() {
         }
     }
 
-    // --- 비디오 모달 창 드래그 이동 및 크기 조절 초기화 ---
-    function initModalInteractions() {
-        const header = document.getElementById('video-modal-header');
+    // --- 비디오 모달 창 드래그 이동 시작 (인라인 / 이벤트 리스너 공용) ---
+    function startDrag(e) {
+        if (!e) return;
+        // 버튼, 셀렉트, 인풋 등 대화형 요소 클릭 시 드래그 방지
+        if (e.target && e.target.closest && e.target.closest('button, select, input, a, .btn-video-modal-close')) return;
+        if (isTheaterMode) return; // 극장모드일 때는 이동 잠금
+
         const container = document.getElementById('video-modal-container');
-        const resizer = document.getElementById('video-modal-resizer');
+        const header = document.getElementById('video-modal-header');
+        if (!container || !header) return;
 
-        if (!header || !container) return;
+        e.preventDefault();
+        const rect = container.getBoundingClientRect();
+        
+        // fixed 좌표계로 전환
+        container.style.position = 'fixed';
+        container.style.left = `${rect.left}px`;
+        container.style.top = `${rect.top}px`;
+        container.style.margin = '0';
 
-        // 1. 헤더 드래그 창 이동
-        header.addEventListener('mousedown', (e) => {
-            // 버튼, 셀렉트, 인풋 등 대화형 요소 클릭 시 드래그 방지
-            if (e.target.closest('button, select, input, a, .btn-video-modal-close')) return;
-            if (isTheaterMode) return; // 극장모드일 때는 이동 잠금
+        dragPos.startX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        dragPos.startY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        dragPos.initialLeft = rect.left;
+        dragPos.initialTop = rect.top;
+        dragPos.isDragging = true;
+        header.classList.add('is-dragging');
 
-            e.preventDefault();
-            const rect = container.getBoundingClientRect();
-            
-            // fixed 좌표계로 전환
-            container.style.position = 'fixed';
-            container.style.left = `${rect.left}px`;
-            container.style.top = `${rect.top}px`;
-            container.style.margin = '0';
+        const onMouseMove = (moveEvent) => {
+            if (!dragPos.isDragging) return;
+            moveEvent.preventDefault();
+            const clientX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientX : 0);
+            const clientY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientY : 0);
+            const deltaX = clientX - dragPos.startX;
+            const deltaY = clientY - dragPos.startY;
 
-            dragPos.startX = e.clientX;
-            dragPos.startY = e.clientY;
-            dragPos.initialLeft = rect.left;
-            dragPos.initialTop = rect.top;
-            dragPos.isDragging = true;
-            header.classList.add('is-dragging');
+            let nextLeft = dragPos.initialLeft + deltaX;
+            let nextTop = dragPos.initialTop + deltaY;
 
-            const onMouseMove = (moveEvent) => {
-                if (!dragPos.isDragging) return;
-                moveEvent.preventDefault();
-                const deltaX = moveEvent.clientX - dragPos.startX;
-                const deltaY = moveEvent.clientY - dragPos.startY;
+            // 뷰포트 안전 경계 (화면 밖 이탈 방지)
+            const minLeft = 10;
+            const maxLeft = window.innerWidth - container.offsetWidth - 10;
+            const minTop = 10;
+            const maxTop = window.innerHeight - container.offsetHeight - 10;
 
-                let nextLeft = dragPos.initialLeft + deltaX;
-                let nextTop = dragPos.initialTop + deltaY;
+            nextLeft = Math.max(minLeft, Math.min(maxLeft, nextLeft));
+            nextTop = Math.max(minTop, Math.min(maxTop, nextTop));
 
-                // 뷰포트 안전 경계 (화면 밖 이탈 방지)
-                const minLeft = 10;
-                const maxLeft = window.innerWidth - container.offsetWidth - 10;
-                const minTop = 10;
-                const maxTop = window.innerHeight - container.offsetHeight - 10;
+            container.style.left = `${nextLeft}px`;
+            container.style.top = `${nextTop}px`;
+        };
 
-                nextLeft = Math.max(minLeft, Math.min(maxLeft, nextLeft));
-                nextTop = Math.max(minTop, Math.min(maxTop, nextTop));
+        const onMouseUp = () => {
+            dragPos.isDragging = false;
+            header.classList.remove('is-dragging');
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            document.removeEventListener('touchmove', onMouseMove);
+            document.removeEventListener('touchend', onMouseUp);
+        };
 
-                container.style.left = `${nextLeft}px`;
-                container.style.top = `${nextTop}px`;
-            };
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('touchmove', onMouseMove, { passive: false });
+        document.addEventListener('touchend', onMouseUp);
+    }
 
-            const onMouseUp = () => {
-                dragPos.isDragging = false;
-                header.classList.remove('is-dragging');
-                document.removeEventListener('mousemove', onMouseMove);
-                document.removeEventListener('mouseup', onMouseUp);
-            };
+    // --- 우하단 핸들 창 크기 조절 시작 (인라인 / 이벤트 리스너 공용) ---
+    function startResize(e) {
+        if (!e) return;
+        const container = document.getElementById('video-modal-container');
+        if (!container) return;
 
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
+        e.preventDefault();
+        e.stopPropagation();
 
-        // 2. 우하단 핸들 창 크기 조절 (Resizable)
-        if (resizer) {
-            resizer.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
+        const rect = container.getBoundingClientRect();
+        container.style.position = 'fixed';
+        container.style.left = `${rect.left}px`;
+        container.style.top = `${rect.top}px`;
+        container.style.margin = '0';
 
-                const rect = container.getBoundingClientRect();
-                container.style.position = 'fixed';
-                container.style.left = `${rect.left}px`;
-                container.style.top = `${rect.top}px`;
-                container.style.margin = '0';
+        resizePos.startX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        resizePos.startY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+        resizePos.initialWidth = rect.width;
+        resizePos.initialHeight = rect.height;
+        resizePos.isResizing = true;
 
-                resizePos.startX = e.clientX;
-                resizePos.startY = e.clientY;
-                resizePos.initialWidth = rect.width;
-                resizePos.initialHeight = rect.height;
-                resizePos.isResizing = true;
-
-                // 극장모드 클래스 해제하여 인라인 사이즈 적용 가능하게 함
-                if (isTheaterMode) {
-                    isTheaterMode = false;
-                    container.classList.remove('theater-mode');
-                    const textEl = document.getElementById('theater-mode-text');
-                    if (textEl) textEl.textContent = '극장모드';
-                }
-
-                const onResizeMove = (moveEvent) => {
-                    if (!resizePos.isResizing) return;
-                    moveEvent.preventDefault();
-                    const deltaX = moveEvent.clientX - resizePos.startX;
-                    const deltaY = moveEvent.clientY - resizePos.startY;
-
-                    let newW = resizePos.initialWidth + deltaX;
-                    let newH = resizePos.initialHeight + deltaY;
-
-                    // 최소/최대 크기 제한
-                    newW = Math.max(380, Math.min(window.innerWidth - rect.left - 10, newW));
-                    newH = Math.max(280, Math.min(window.innerHeight - rect.top - 10, newH));
-
-                    container.style.width = `${newW}px`;
-                    container.style.maxWidth = '98vw';
-                    container.style.height = `${newH}px`;
-                    container.style.maxHeight = '98vh';
-                };
-
-                const onResizeUp = () => {
-                    resizePos.isResizing = false;
-                    document.removeEventListener('mousemove', onResizeMove);
-                    document.removeEventListener('mouseup', onResizeUp);
-                };
-
-                document.addEventListener('mousemove', onResizeMove);
-                document.addEventListener('mouseup', onResizeUp);
-            });
+        // 극장모드 클래스 해제하여 인라인 사이즈 적용 가능하게 함
+        if (isTheaterMode) {
+            isTheaterMode = false;
+            container.classList.remove('theater-mode');
+            const textEl = document.getElementById('theater-mode-text');
+            if (textEl) textEl.textContent = '극장모드';
         }
+
+        const onResizeMove = (moveEvent) => {
+            if (!resizePos.isResizing) return;
+            moveEvent.preventDefault();
+            const clientX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientX : 0);
+            const clientY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientY : 0);
+            const deltaX = clientX - resizePos.startX;
+            const deltaY = clientY - resizePos.startY;
+
+            let newW = resizePos.initialWidth + deltaX;
+            let newH = resizePos.initialHeight + deltaY;
+
+            // 최소/최대 크기 제한
+            newW = Math.max(360, Math.min(window.innerWidth - rect.left - 10, newW));
+            newH = Math.max(260, Math.min(window.innerHeight - rect.top - 10, newH));
+
+            container.style.width = `${newW}px`;
+            container.style.maxWidth = '98vw';
+            container.style.height = `${newH}px`;
+            container.style.maxHeight = '98vh';
+        };
+
+        const onResizeUp = () => {
+            resizePos.isResizing = false;
+            document.removeEventListener('mousemove', onResizeMove);
+            document.removeEventListener('mouseup', onResizeUp);
+            document.removeEventListener('touchmove', onResizeMove);
+            document.removeEventListener('touchend', onResizeUp);
+        };
+
+        document.addEventListener('mousemove', onResizeMove);
+        document.addEventListener('mouseup', onResizeUp);
+        document.addEventListener('touchmove', onResizeMove, { passive: false });
+        document.addEventListener('touchend', onResizeUp);
     }
 
     // --- PiP (화면 속 화면) ---
@@ -1364,6 +1374,7 @@ window.VideoEngine = (function() {
         deleteBookmark,
         cancelAutoPlay,
         closeVideoPlayerModal,
-        initModalInteractions
+        startDrag,
+        startResize
     };
 })();

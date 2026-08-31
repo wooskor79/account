@@ -753,7 +753,7 @@ $show_lock_gate = $is_private && !$is_admin;
         <div class="video-modal-container max-w-5xl w-full mx-4 bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-slate-700/80 flex flex-col max-h-[92vh] relative" id="video-modal-container" onclick="event.stopPropagation()">
             
             <!-- 플레이어 헤더 (드래그 핸들 및 더블클릭 최대화) -->
-            <div class="video-modal-header px-5 py-3.5 bg-slate-950 flex items-center justify-between gap-3 border-b border-slate-800 shrink-0 cursor-move select-none" id="video-modal-header" ondblclick="VideoEngine.toggleTheaterMode()" title="헤더를 드래그하여 창 이동 / 더블클릭하여 화면 크기 토글">
+            <div class="video-modal-header px-5 py-3.5 bg-slate-950 flex items-center justify-between gap-3 border-b border-slate-800 shrink-0 cursor-move select-none" id="video-modal-header" onmousedown="VideoEngine.startDrag(event)" ondblclick="VideoEngine.toggleTheaterMode()" title="헤더를 드래그하여 창 이동 / 더블클릭하여 화면 크기 토글">
                 <div class="flex items-center gap-2.5 min-w-0 pointer-events-none">
                     <span class="w-8 h-8 rounded-xl bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-sm font-bold shrink-0">🎬</span>
                     <h3 id="video-modal-title" class="text-sm sm:text-base font-extrabold text-white truncate">강의 동영상</h3>
@@ -852,7 +852,7 @@ $show_lock_gate = $is_private && !$is_admin;
             </div>
 
             <!-- 우측 하단 리사이즈 핸들 -->
-            <div id="video-modal-resizer" class="video-modal-resizer" title="드래그하여 창 크기 자유 조절"></div>
+            <div id="video-modal-resizer" class="video-modal-resizer" onmousedown="VideoEngine.startResize(event)" title="드래그하여 창 크기 자유 조절"></div>
         </div>
     </div>
 
