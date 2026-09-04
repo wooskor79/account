@@ -214,28 +214,65 @@ $show_lock_gate = $is_private && !$is_admin;
 </head>
 <body>
 
-    <!-- 첫 화면 사이트 접근 잠금 화면 (비공개 모드 시 활성화) -->
-    <div id="site-lock-gate" class="<?php echo $show_lock_gate ? '' : 'hidden'; ?> fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md px-4">
-        <div class="bg-white rounded-3xl shadow-2xl p-7 sm:p-9 max-w-sm sm:max-w-md w-full text-center border border-slate-100 transition-all transform scale-100">
-            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
-                🔒
+    <!-- 첫 화면 통합 로그인/회원가입 게이트 (비공개 모드 및 공통 인증) -->
+    <div id="site-lock-gate" class="<?php echo $show_lock_gate ? '' : 'hidden'; ?> fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md px-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl shadow-2xl p-7 sm:p-9 max-w-sm sm:max-w-md w-full text-center border border-slate-100 transition-all transform scale-100 my-8">
+            <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
+                🔐
             </div>
             <h2 class="text-xl sm:text-2xl font-bold text-slate-800 mb-2">전산회계 학습 자료실</h2>
             <p class="text-xs sm:text-sm text-slate-500 mb-6 leading-relaxed">
-                현재 <strong class="text-amber-600 font-bold">비공개</strong>로 운영 중입니다.<br>
-                접속을 위해 비밀번호를 입력해 주세요.
+                서비스 이용을 위해 로그인이 필요합니다.
             </p>
             
-            <form onsubmit="unlockSite(event)" class="space-y-4 text-left">
+            <!-- 탭 메뉴 -->
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-6">
+                <button type="button" id="auth-tab-login" onclick="AuthEngine.switchTab('login')" class="flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-blue-600 transition-all">로그인</button>
+                <button type="button" id="auth-tab-register" onclick="AuthEngine.switchTab('register')" class="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">회원가입</button>
+            </div>
+
+            <!-- 로그인 폼 -->
+            <form id="auth-login-form" onsubmit="AuthEngine.submitLogin(event)" class="space-y-4 text-left block">
                 <div>
-                    <input type="password" id="gate-password-input" placeholder="비밀번호 입력" 
-                        class="w-full px-4 py-3.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-center font-bold text-slate-800 shadow-inner tracking-widest text-base"
-                        autofocus autocomplete="current-password">
-                    <p id="gate-error-message" class="text-xs text-rose-500 font-semibold mt-2 text-center hidden">❌ 비밀번호가 올바르지 않습니다.</p>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">아이디 (이름)</label>
+                    <input type="text" id="auth-login-username" placeholder="예: 홍길동" 
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition"
+                        autofocus>
                 </div>
-                <button type="submit" id="gate-submit-btn" 
-                    class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
-                    확인 및 입장 ➜
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호</label>
+                    <input type="password" id="auth-login-password" placeholder="비밀번호 입력" 
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition"
+                        autocomplete="current-password">
+                </div>
+                <p id="auth-login-error" class="text-xs text-rose-500 font-semibold mt-2 text-center hidden"></p>
+                <button type="submit" 
+                    class="w-full mt-2 py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+                    로그인 ➜
+                </button>
+            </form>
+
+            <!-- 회원가입 폼 -->
+            <form id="auth-register-form" onsubmit="AuthEngine.submitRegister(event)" class="space-y-4 text-left hidden">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">아이디 (이름)</label>
+                    <input type="text" id="auth-reg-username" placeholder="사용할 아이디(이름)를 입력하세요" 
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호 (4자리 이상)</label>
+                    <input type="password" id="auth-reg-password" placeholder="비밀번호 입력" 
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호 확인</label>
+                    <input type="password" id="auth-reg-password-confirm" placeholder="비밀번호 다시 입력" 
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                </div>
+                <p id="auth-reg-error" class="text-xs text-rose-500 font-semibold mt-2 text-center hidden"></p>
+                <button type="submit" 
+                    class="w-full mt-2 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition transform active:scale-95 flex items-center justify-center gap-2">
+                    가입하기 ➜
                 </button>
             </form>
         </div>
@@ -1044,6 +1081,11 @@ $show_lock_gate = $is_private && !$is_admin;
                     <h3 id="preview-file-title" class="doc-title-text">파일명</h3>
                 </div>
                 <div class="doc-header-right">
+                    <div id="preview-img-zoom-controls" class="doc-zoom-group" style="display:none;">
+                        <button class="btn-col-btn" onclick="zoomDocImage(-0.2)" title="축소">🔍 -</button>
+                        <button id="doc-zoom-level" class="btn-col-btn" onclick="resetDocImageZoom()" title="기본 크기 복원">100%</button>
+                        <button class="btn-col-btn" onclick="zoomDocImage(0.2)" title="확대">🔍 +</button>
+                    </div>
                     <div id="preview-col-controls" class="doc-col-group" style="display:none;">
                         <button class="btn-col-btn" onclick="setDocColumns(1, this)">1단</button>
                         <button class="btn-col-btn" onclick="setDocColumns(2, this)">2단</button>
@@ -1083,6 +1125,9 @@ $show_lock_gate = $is_private && !$is_admin;
                 <!-- 4. HWP / HWPX / TXT 문서 뷰어 -->
                 <div id="preview-doc-container" class="preview-doc-box" style="display:none;"></div>
             </div>
+
+            <!-- 우측 하단 크기 조절 핸들 (Resizer) -->
+            <div id="doc-modal-resizer" class="doc-modal-resizer" onmousedown="startDocModalResize(event)" ontouchstart="startDocModalResize(event)" title="드래그하여 창 크기 자유 조절"></div>
         </div>
     </div>
 
@@ -1114,5 +1159,116 @@ $show_lock_gate = $is_private && !$is_admin;
     <script src="js/learning/learning_engine.js?v=<?php echo time(); ?>"></script>
     <script src="js/video_engine.js?v=<?php echo time(); ?>"></script>
     <script src="js/main.js?v=<?php echo time(); ?>"></script>
+    <!-- 통합 인증(로그인/회원가입) 엔진 -->
+    <script>
+    const AuthEngine = {
+        switchTab: function(tabName) {
+            const loginForm = document.getElementById('auth-login-form');
+            const regForm = document.getElementById('auth-register-form');
+            const loginTab = document.getElementById('auth-tab-login');
+            const regTab = document.getElementById('auth-tab-register');
+            
+            if (tabName === 'login') {
+                loginForm.classList.remove('hidden');
+                loginForm.classList.add('block');
+                regForm.classList.add('hidden');
+                regForm.classList.remove('block');
+                
+                loginTab.className = 'flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-blue-600 transition-all';
+                regTab.className = 'flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all';
+            } else {
+                loginForm.classList.add('hidden');
+                loginForm.classList.remove('block');
+                regForm.classList.remove('hidden');
+                regForm.classList.add('block');
+                
+                regTab.className = 'flex-1 py-2 text-sm font-bold rounded-lg bg-white shadow-sm text-indigo-600 transition-all';
+                loginTab.className = 'flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all';
+            }
+        },
+
+        submitLogin: async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('auth-login-username').value.trim();
+            const password = document.getElementById('auth-login-password').value;
+            const errEl = document.getElementById('auth-login-error');
+            
+            if(!username || !password) {
+                errEl.textContent = '아이디와 비밀번호를 모두 입력해주세요.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                const res = await fetch('api.php?action=learning_login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                const data = await res.json();
+                
+                if(data.success) {
+                    // 로그인 성공 시 사이트 잠금 해제 및 사용자 정보 저장
+                    document.getElementById('site-lock-gate').classList.add('hidden');
+                    window.currentUser = data.user;
+                    window.sessionStorage.setItem('learning_username', username);
+                    // 기존 quiz 이름 연동
+                    if(typeof syncUserName === 'function') syncUserName(username);
+                    alert("로그인 성공! 환영합니다.");
+                    // 새로고침하여 상태 반영
+                    location.reload();
+                } else {
+                    errEl.innerText = data.message;
+                    errEl.classList.remove('hidden');
+                    if(data.message.includes('차단')) {
+                        alert(data.message); // 차단 알림용 커스텀 모달 활용
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                errEl.textContent = '서버와 통신 중 오류가 발생했습니다.';
+                errEl.classList.remove('hidden');
+            }
+        },
+
+        submitRegister: async function(e) {
+            e.preventDefault();
+            const username = document.getElementById('auth-reg-username').value.trim();
+            const password = document.getElementById('auth-reg-password').value;
+            const password_confirm = document.getElementById('auth-reg-password-confirm').value;
+            const errEl = document.getElementById('auth-reg-error');
+            
+            if(!username || !password || !password_confirm) {
+                errEl.textContent = '모든 항목을 입력해주세요.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                const res = await fetch('api.php?action=learning_register', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password, password_confirm})
+                });
+                const data = await res.json();
+                
+                if(data.success) {
+                    alert("회원가입이 완료되었습니다!\n이제 로그인 해보세요.");
+                    this.switchTab('login');
+                    document.getElementById('auth-login-username').value = username;
+                    document.getElementById('auth-login-password').value = '';
+                    document.getElementById('auth-login-password').focus();
+                } else {
+                    errEl.innerText = data.message;
+                    errEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+                errEl.textContent = '서버와 통신 중 오류가 발생했습니다.';
+                errEl.classList.remove('hidden');
+            }
+        }
+    };
+    </script>
 </body>
 </html>

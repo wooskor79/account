@@ -87,6 +87,27 @@ $env_vars = load_env(__DIR__ . '/.env');
 $gate_password = isset($env_vars['GATE_PASSWORD']) ? $env_vars['GATE_PASSWORD'] : (getenv('GATE_PASSWORD') ?: "1100");
 $admin_password = isset($env_vars['ADMIN_PASSWORD']) ? $env_vars['ADMIN_PASSWORD'] : (getenv('ADMIN_PASSWORD') ?: "!@#$");
 
+// MariaDB PDO 연동
+$pdo = null;
+try {
+    $db_host = isset($env_vars['DB_HOST']) ? $env_vars['DB_HOST'] : '127.0.0.1';
+    $db_port = isset($env_vars['DB_PORT']) ? $env_vars['DB_PORT'] : '3306';
+    $db_name = isset($env_vars['DB_NAME']) ? $env_vars['DB_NAME'] : 'account_db';
+    $db_user = isset($env_vars['DB_USER']) ? $env_vars['DB_USER'] : 'root';
+    $db_pass = isset($env_vars['DB_PASS']) ? $env_vars['DB_PASS'] : '';
+
+    $dsn = "mysql:host={$db_host};port={$db_port};dbname={$db_name};charset=utf8mb4";
+    $pdo = new PDO($dsn, $db_user, $db_pass, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        PDO::ATTR_EMULATE_PREPARES => false,
+    ]);
+} catch (PDOException $e) {
+    // DB 연결 실패 시 에러 로깅 처리 (실제 환경에서는 화면에 출력하지 않음)
+    error_log("DB Connection Failed: " . $e->getMessage());
+}
+
+
 $grade = isset($_REQUEST['grade']) && in_array($_REQUEST['grade'], ['grade1', 'grade2']) ? $_REQUEST['grade'] : 'grade2';
 
 $base_share = file_exists('/volume1/ShareFolder/Share/전산회계자료') ? '/volume1/ShareFolder/Share/전산회계자료' : __DIR__ . '/uploads';
@@ -171,19 +192,13 @@ if ($action) {
                     $base_dir = realpath(__DIR__);
                 }
             }
-        } else {
-            $target_file = realpath($video_dir . '/' . $path);
-            $base_dir = realpath($video_dir);
-        }
-        
-        $norm_target = $target_file ? str_replace('\\', '/', strtolower($target_file)) : '';
-        $norm_base = $base_dir ? str_replace('\\', '/', strtolower($base_dir)) : '';
-        if ($target_file === false || strpos($norm_target, $norm_base) !== 0 || !is_file($target_file)) {
-            http_response_code(404);
-            exit('파일을 찾을 수 없습니다.');
-        }
+            $norm_target = $target_file ? str_replace('\\', '/', strtolower($target_file)) : '';
+            $norm_base = $base_dir ? str_replace('\\', '/', strtolower($base_dir)) : '';
+            if ($target_file === false || strpos($norm_target, $norm_base) !== 0 || !is_file($target_file)) {
+                http_response_code(404);
+                exit('파일을 찾을 수 없습니다.');
+            }
 
-        if ($action === 'view_image' || $action === 'view_drawing') {
             $ext = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
             $mime_type = 'image/png';
             if ($ext === 'jpg' || $ext === 'jpeg') $mime_type = 'image/jpeg';
@@ -194,64 +209,107 @@ if ($action) {
             header('Content-Length: ' . filesize($target_file));
             readfile($target_file);
             exit;
-        }
+        } else {
+            // 비디오 스트리밍
+            $target_file = realpath($video_dir . '/' . $path);
+            $base_dir = realpath($video_dir);
 
-        $fp = @fopen($target_file, 'rb');
-        $size   = filesize($target_file);
-        $length = $size;
-        $start  = 0;
-        $end    = $size - 1;
-        
-        $ext = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
-        $mime_type = 'video/mp4';
-        if ($ext === 'webm') $mime_type = 'video/webm';
-        if ($ext === 'ogg') $mime_type = 'video/ogg';
-
-        header('Content-type: ' . $mime_type);
-        header("Accept-Ranges: bytes");
-
-        if (isset($_SERVER['HTTP_RANGE'])) {
-            $c_start = $start;
-            $c_end   = $end;
-            list(, $range) = explode('=', $_SERVER['HTTP_RANGE'], 2);
-            if (strpos($range, ',') !== false) {
-                header('HTTP/1.1 416 Requested Range Not Satisfiable');
-                header("Content-Range: bytes $start-$end/$size");
-                exit;
+            if ($target_file === false || !is_file($target_file)) {
+                $candidate = $video_dir . '/' . $path;
+                if (file_exists($candidate) && is_file($candidate)) {
+                    $target_file = $candidate;
+                } else {
+                    $candidate_decoded = $video_dir . '/' . rawurldecode($path);
+                    if (file_exists($candidate_decoded) && is_file($candidate_decoded)) {
+                        $target_file = $candidate_decoded;
+                    }
+                }
             }
-            if (strpos($range, '-') === 0) {
-                $c_start = $size - (int)substr($range, 1);
+
+            if (!$target_file || !file_exists($target_file) || !is_file($target_file)) {
+                http_response_code(404);
+                exit('비디오 파일을 찾을 수 없습니다.');
+            }
+
+            // 세션 락 해제 및 출력 버퍼링 정리 (스트리밍 멈춤 방지의 핵심)
+            session_write_close();
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+
+            $size = filesize($target_file);
+            $length = $size;
+            $start = 0;
+            $end = $size - 1;
+            
+            $ext = strtolower(pathinfo($target_file, PATHINFO_EXTENSION));
+            $mime_type = 'video/mp4';
+            if ($ext === 'webm') $mime_type = 'video/webm';
+            else if ($ext === 'ogg') $mime_type = 'video/ogg';
+            else if ($ext === 'mkv') $mime_type = 'video/x-matroska';
+            else if ($ext === 'mov') $mime_type = 'video/quicktime';
+            else if ($ext === 'avi') $mime_type = 'video/x-msvideo';
+
+            header('Content-Type: ' . $mime_type);
+            header("Accept-Ranges: bytes");
+
+            if (isset($_SERVER['HTTP_RANGE'])) {
+                $c_start = $start;
+                $c_end   = $end;
+                list(, $range) = explode('=', $_SERVER['HTTP_RANGE'], 2);
+                if (strpos($range, ',') !== false) {
+                    header('HTTP/1.1 416 Requested Range Not Satisfiable');
+                    header("Content-Range: bytes $start-$end/$size");
+                    exit;
+                }
+                if (strpos($range, '-') === 0) {
+                    $c_start = $size - (int)substr($range, 1);
+                } else {
+                    $range  = explode('-', $range);
+                    $c_start = (int)$range[0];
+                    $c_end   = (isset($range[1]) && is_numeric($range[1])) ? (int)$range[1] : $size - 1;
+                }
+                $c_end = ($c_end > $end) ? $end : $c_end;
+                if ($c_start > $c_end || $c_start > $size - 1 || $c_end >= $size) {
+                    header('HTTP/1.1 416 Requested Range Not Satisfiable');
+                    header("Content-Range: bytes $start-$end/$size");
+                    exit;
+                }
+                $start  = $c_start;
+                $end    = $c_end;
+                $length = $end - $start + 1;
+
+                $fp = @fopen($target_file, 'rb');
+                if (!$fp) {
+                    http_response_code(500);
+                    exit('파일을 열 수 없습니다.');
+                }
+                fseek($fp, $start);
+                header('HTTP/1.1 206 Partial Content');
             } else {
-                $range  = explode('-', $range);
-                $c_start = (int)$range[0];
-                $c_end   = (isset($range[1]) && is_numeric($range[1])) ? (int)$range[1] : $size - 1;
+                $fp = @fopen($target_file, 'rb');
+                if (!$fp) {
+                    http_response_code(500);
+                    exit('파일을 열 수 없습니다.');
+                }
+                header('HTTP/1.1 200 OK');
             }
-            $c_end = ($c_end > $end) ? $end : $c_end;
-            if ($c_start > $c_end || $c_start > $size - 1 || $c_end >= $size) {
-                header('HTTP/1.1 416 Requested Range Not Satisfiable');
-                header("Content-Range: bytes $start-$end/$size");
-                exit;
+            
+            header("Content-Range: bytes $start-$end/$size");
+            header("Content-Length: " . $length);
+            
+            $buffer = 1024 * 64; // 64KB 청크 버퍼
+            while(!feof($fp) && ($p = ftell($fp)) <= $end) {
+                if ($p + $buffer > $end) {
+                    $buffer = $end - $p + 1;
+                }
+                set_time_limit(0);
+                echo fread($fp, $buffer);
+                flush();
             }
-            $start  = $c_start;
-            $end    = $c_end;
-            $length = $end - $start + 1;
-            fseek($fp, $start);
-            header('HTTP/1.1 206 Partial Content');
+            fclose($fp);
+            exit;
         }
-        
-        header("Content-Range: bytes $start-$end/$size");
-        header("Content-Length: ".$length);
-        $buffer = 1024 * 8;
-        while(!feof($fp) && ($p = ftell($fp)) <= $end) {
-            if ($p + $buffer > $end) {
-                $buffer = $end - $p + 1;
-            }
-            set_time_limit(0);
-            echo fread($fp, $buffer);
-            flush();
-        }
-        fclose($fp);
-        exit;
     }
 
     header('Content-Type: application/json; charset=utf-8');
@@ -405,7 +463,11 @@ if ($action) {
         $current_dir = $video_dir . ($sub_path ? '/' . $sub_path : '');
         
         if (!is_dir($current_dir)) {
-            echo json_encode(['error' => '디렉토리를 찾을 수 없습니다.', 'path' => $current_dir]);
+            @mkdir($current_dir, 0777, true);
+        }
+
+        if (!is_dir($current_dir)) {
+            echo json_encode(['current_path' => $sub_path, 'items' => []]);
             exit;
         }
 
@@ -432,13 +494,82 @@ if ($action) {
         }
 
         usort($items, function($a, $b) {
-            if ($a['type'] === $b['type']) return strcasecmp($a['name'], $b['name']);
+            if ($a['type'] === $b['type']) return strnatcasecmp($a['name'], $b['name']);
             return $a['type'] === 'folder' ? -1 : 1;
         });
 
         echo json_encode([
+            'grade' => $grade,
             'current_path' => $sub_path,
             'items' => $items
+        ]);
+        exit;
+    }
+
+    // 영상 시청 진도(이어보기, 수강완료, 북마크) 저장 API
+    if ($action === 'save_video_progress') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input || empty($input['video_key'])) {
+            echo json_encode(['success' => false, 'message' => '잘못된 요청입니다.']);
+            exit;
+        }
+
+        $video_key = preg_replace('/[^a-zA-Z0-9_\-\.\/]/', '_', $input['video_key']);
+        $pos = isset($input['position']) ? floatval($input['position']) : 0;
+        $dur = isset($input['duration']) ? floatval($input['duration']) : 0;
+        $completed = !empty($input['completed']);
+        $bookmarks = isset($input['bookmarks']) && is_array($input['bookmarks']) ? $input['bookmarks'] : [];
+
+        $learning_progress_file = __DIR__ . '/data/learning_progress.json';
+        $user_id = isset($_SESSION['learning_user']['id']) ? $_SESSION['learning_user']['id'] : null;
+
+        if ($user_id) {
+            atomic_json_modify($learning_progress_file, function($data) use ($user_id, $video_key, $pos, $dur, $completed, $bookmarks) {
+                if (!isset($data[$user_id])) {
+                    $data[$user_id] = [];
+                }
+                if (!isset($data[$user_id]['video_progress'])) {
+                    $data[$user_id]['video_progress'] = [];
+                }
+                
+                $data[$user_id]['video_progress'][$video_key] = [
+                    'position' => $pos,
+                    'duration' => $dur,
+                    'completed' => $completed,
+                    'bookmarks' => $bookmarks,
+                    'updated_at' => date('Y-m-d H:i:s')
+                ];
+                return $data;
+            });
+        }
+
+        echo json_encode([
+            'success' => true,
+            'is_logged_in' => !empty($user_id),
+            'video_key' => $video_key,
+            'position' => $pos,
+            'completed' => $completed
+        ]);
+        exit;
+    }
+
+    // 영상 시청 진도 전체 조회 API
+    if ($action === 'get_video_progress') {
+        $user_id = isset($_SESSION['learning_user']['id']) ? $_SESSION['learning_user']['id'] : null;
+        $learning_progress_file = __DIR__ . '/data/learning_progress.json';
+        $video_progress = [];
+
+        if ($user_id) {
+            $data = atomic_json_read($learning_progress_file);
+            if (is_array($data) && isset($data[$user_id]['video_progress'])) {
+                $video_progress = $data[$user_id]['video_progress'];
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'is_logged_in' => !empty($user_id),
+            'video_progress' => $video_progress
         ]);
         exit;
     }
@@ -1193,55 +1324,47 @@ if ($action) {
             exit(json_encode(['success' => false, 'message' => '비밀번호와 비밀번호 확인이 일치하지 않습니다.']));
         }
 
-        $users = atomic_json_read($learning_users_file);
-        if (!is_array($users)) $users = [];
-
-        foreach ($users as $u) {
-            if (isset($u['username']) && mb_strtolower($u['username'], 'UTF-8') === mb_strtolower($username, 'UTF-8')) {
-                http_response_code(409);
-                exit(json_encode(['success' => false, 'message' => '이미 등록된 학습자 이름입니다. 다른 이름을 사용해주세요.']));
-            }
+        if (!$pdo) {
+            http_response_code(500);
+            exit(json_encode(['success' => false, 'message' => '데이터베이스 연결에 실패했습니다.']));
         }
 
-        $user_id = 'user_' . bin2hex(random_bytes(8));
-        $new_user = [
-            'id' => $user_id,
-            'username' => $username,
-            'password_hash' => password_hash($password, PASSWORD_BCRYPT),
-            'created_at' => date('Y-m-d H:i:s'),
-            'last_login' => date('Y-m-d H:i:s')
-        ];
+        // 아이디 중복 체크
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = :username");
+        $stmt->execute([':username' => $username]);
+        if ($stmt->fetch()) {
+            http_response_code(409);
+            exit(json_encode(['success' => false, 'message' => '이미 등록된 아이디(이름)입니다. 다른 이름을 사용해주세요.']));
+        }
 
-        atomic_json_modify($learning_users_file, function($data) use ($new_user) {
-            if (!is_array($data)) $data = [];
-            $data[] = $new_user;
-            return $data;
-        });
+        $password_hash = password_hash($password, PASSWORD_BCRYPT);
+        // 이우성 또는 admin 이라는 이름으로 가입 시도 시 role='admin' 부여 가능 (혹은 수동부여)
+        $role = ($username === '이우성' || $username === 'admin') ? 'admin' : 'user';
+        
+        $stmt = $pdo->prepare("INSERT INTO users (username, password_hash, role) VALUES (:username, :password_hash, :role)");
+        $stmt->execute([
+            ':username' => $username,
+            ':password_hash' => $password_hash,
+            ':role' => $role
+        ]);
+        
+        $user_id = $pdo->lastInsertId();
 
         // 세션 로그인
         $_SESSION['learning_user'] = [
             'id' => $user_id,
-            'username' => $username
+            'username' => $username,
+            'is_admin' => ($role === 'admin')
         ];
 
-        // 기본 진도율 초기화
-        atomic_json_modify($learning_progress_file, function($data) use ($user_id) {
-            if (!is_array($data)) $data = [];
-            if (!isset($data[$user_id])) {
-                $data[$user_id] = [
-                    'completed_steps' => [],
-                    'section_progress' => [],
-                    'wrong_notes' => [],
-                    'stats' => ['solved_count' => 0, 'correct_count' => 0]
-                ];
-            }
-            return $data;
-        });
+        // 가입 완료 후 빈 학습 통계 레코드 생성 (선택 사항)
+        $stmt = $pdo->prepare("INSERT IGNORE INTO learning_stats (user_id, grade, subject) VALUES (:uid, 'grade1', 'default'), (:uid2, 'grade2', 'default')");
+        $stmt->execute([':uid' => $user_id, ':uid2' => $user_id]);
 
         echo json_encode([
             'success' => true,
             'message' => '회원가입이 완료되었습니다!',
-            'user' => ['id' => $user_id, 'username' => $username]
+            'user' => ['id' => $user_id, 'username' => $username, 'is_admin' => ($role === 'admin')]
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -1257,65 +1380,61 @@ if ($action) {
             exit(json_encode(['success' => false, 'message' => '이름과 비밀번호를 입력해주세요.']));
         }
 
-        // --- 관리자(admin) 로그인 처리 ---
-        if (mb_strtolower($username, 'UTF-8') === 'admin') {
-            if ($password === $admin_password) {
-                $_SESSION['learning_user'] = [
+        if (!$pdo) {
+            http_response_code(500);
+            exit(json_encode(['success' => false, 'message' => '데이터베이스 연결에 실패했습니다.']));
+        }
+
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = :username");
+        $stmt->execute([':username' => $username]);
+        $user = $stmt->fetch();
+
+        // 1. 아이디 존재 및 비밀번호 검증
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            // 특수 관리자(admin) 패스워드 호환성 (환경변수 ADMIN_PASSWORD)
+            if (mb_strtolower($username, 'UTF-8') === 'admin' && $password === $admin_password) {
+                // 통과
+                $user = [
                     'id' => 'admin',
                     'username' => '관리자',
-                    'is_admin' => true
+                    'role' => 'admin',
+                    'is_blocked' => 0
                 ];
-                echo json_encode([
-                    'success' => true,
-                    'message' => '관리자로 로그인되었습니다.',
-                    'user' => ['id' => 'admin', 'username' => '관리자', 'is_admin' => true]
-                ], JSON_UNESCAPED_UNICODE);
-                exit;
             } else {
                 http_response_code(401);
-                exit(json_encode(['success' => false, 'message' => '관리자 비밀번호가 올바르지 않습니다.']));
+                exit(json_encode(['success' => false, 'message' => '이름 또는 비밀번호가 올바르지 않습니다.']));
             }
         }
 
-        $users = atomic_json_read($learning_users_file);
-        if (!is_array($users)) $users = [];
-
-        $matched = null;
-        foreach ($users as $u) {
-            if (isset($u['username']) && mb_strtolower($u['username'], 'UTF-8') === mb_strtolower($username, 'UTF-8')) {
-                if (password_verify($password, $u['password_hash'])) {
-                    $matched = $u;
-                    break;
-                }
-            }
+        // 2. 차단 여부 검증
+        if ((int)$user['is_blocked'] === 1) {
+            http_response_code(403);
+            $reason = $user['block_reason'] ? $user['block_reason'] : '관리자에 의해 로그인이 차단되었습니다.';
+            exit(json_encode(['success' => false, 'message' => "차단된 계정입니다.\n사유: " . $reason]));
         }
 
-        if (!$matched) {
-            http_response_code(401);
-            exit(json_encode(['success' => false, 'message' => '이름 또는 비밀번호가 올바르지 않습니다.']));
-        }
-
+        // 3. 세션 등록 및 로그인 시간/IP 기록
         $_SESSION['learning_user'] = [
-            'id' => $matched['id'],
-            'username' => $matched['username']
+            'id' => $user['id'],
+            'username' => $user['username'],
+            'is_admin' => ($user['role'] === 'admin')
         ];
 
-        // 마지막 로그인 갱신
-        atomic_json_modify($learning_users_file, function($data) use ($matched) {
-            if (!is_array($data)) return [];
-            foreach ($data as &$u) {
-                if ($u['id'] === $matched['id']) {
-                    $u['last_login'] = date('Y-m-d H:i:s');
-                    break;
-                }
-            }
-            return $data;
-        });
+        if ($user['id'] !== 'admin') {
+            $ip_address = $_SERVER['REMOTE_ADDR'];
+            // 마지막 접속 업데이트
+            $update_stmt = $pdo->prepare("UPDATE users SET last_login_at = NOW(), last_login_ip = :ip WHERE id = :id");
+            $update_stmt->execute([':ip' => $ip_address, ':id' => $user['id']]);
+
+            // 로그인 로그 기록
+            $log_stmt = $pdo->prepare("INSERT INTO user_logs (user_id, action, ip_address) VALUES (:uid, 'login', :ip)");
+            $log_stmt->execute([':uid' => $user['id'], ':ip' => $ip_address]);
+        }
 
         echo json_encode([
             'success' => true,
             'message' => '로그인 성공!',
-            'user' => ['id' => $matched['id'], 'username' => $matched['username']]
+            'user' => ['id' => $user['id'], 'username' => $user['username'], 'is_admin' => ($user['role'] === 'admin')]
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -1514,7 +1633,8 @@ if ($action) {
     // 7) 관리자용 전체 학습자 진도 현황 통계 API
     if ($action === 'learning_admin_stats') {
         $cur_user = isset($_SESSION['learning_user']) ? $_SESSION['learning_user'] : null;
-        if (!$cur_user || empty($cur_user['is_admin'])) {
+        $is_admin = (!empty($cur_user['is_admin'])) || (isset($_SESSION['admin']) && $_SESSION['admin'] === true);
+        if (!$is_admin) {
             http_response_code(403);
             exit(json_encode(['success' => false, 'message' => '관리자 권한이 필요합니다.']));
         }
@@ -1591,6 +1711,31 @@ if ($action) {
             $total_solved += ($stats['solved_count'] ?? 0);
             $total_correct += ($stats['correct_count'] ?? 0);
 
+            // 영상 시청 기록 집계
+            $v_prog = isset($u_prog['video_progress']) && is_array($u_prog['video_progress']) ? $u_prog['video_progress'] : [];
+            $v_items = [];
+            $v_completed = 0;
+            $v_bookmarks_total = 0;
+
+            foreach ($v_prog as $v_key => $v_data) {
+                $is_comp = !empty($v_data['completed']);
+                if ($is_comp) $v_completed++;
+                $bmarks = isset($v_data['bookmarks']) && is_array($v_data['bookmarks']) ? $v_data['bookmarks'] : [];
+                $v_bookmarks_total += count($bmarks);
+
+                $v_items[] = [
+                    'video_key' => $v_key,
+                    'path' => $v_data['path'] ?? '',
+                    'title' => basename($v_data['path'] ?? $v_key),
+                    'grade' => $v_data['grade'] ?? 'grade2',
+                    'position' => $v_data['position'] ?? 0,
+                    'duration' => $v_data['duration'] ?? 0,
+                    'completed' => $is_comp,
+                    'bookmarks' => $bmarks,
+                    'updated_at' => $v_data['updated_at'] ?? ''
+                ];
+            }
+
             $user_list[] = [
                 'id' => $uid,
                 'username' => $u['username'],
@@ -1603,7 +1748,14 @@ if ($action) {
                 'accuracy' => ($stats['solved_count'] ?? 0) > 0 ? round((($stats['correct_count'] ?? 0) / $stats['solved_count']) * 100) : 0,
                 'wrong_count' => count($wrong_notes),
                 'unresolved_wrong_count' => $unresolved_wrong,
-                'section_details' => $sec_details
+                'wrong_notes' => $wrong_notes,
+                'section_details' => $sec_details,
+                'video_stats' => [
+                    'watched_count' => count($v_items),
+                    'completed_count' => $v_completed,
+                    'bookmarks_count' => $v_bookmarks_total
+                ],
+                'video_items' => $v_items
             ];
         }
 
@@ -1611,13 +1763,22 @@ if ($action) {
         $avg_pct = $user_count > 0 ? round($total_pct_sum / $user_count) : 0;
         $overall_accuracy = $total_solved > 0 ? round(($total_correct / $total_solved) * 100) : 0;
 
+        $total_video_watched = 0;
+        $total_video_completed = 0;
+        foreach ($user_list as $u_item) {
+            $total_video_watched += $u_item['video_stats']['watched_count'];
+            $total_video_completed += $u_item['video_stats']['completed_count'];
+        }
+
         echo json_encode([
             'success' => true,
             'summary' => [
                 'total_users' => $user_count,
                 'avg_progress' => $avg_pct,
                 'total_solved' => $total_solved,
-                'overall_accuracy' => $overall_accuracy
+                'overall_accuracy' => $overall_accuracy,
+                'total_video_watched' => $total_video_watched,
+                'total_video_completed' => $total_video_completed
             ],
             'users' => $user_list
         ], JSON_UNESCAPED_UNICODE);

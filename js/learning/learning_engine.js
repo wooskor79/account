@@ -7,6 +7,22 @@ window.LearningEngine = (function() {
     let currentExtraQuiz = null; // 더풀기용 추가 문제를 보관할 객체
     let loadingExcelFiles = {}; // 엑셀 파일 로딩 중복 방지를 위한 상태 맵
 
+    function getSectionTargets(sId) {
+        if (sId === 'sec_cost' || sId === 'sec_vat') {
+            return { reqT: 8, reqJ: 8, desc: '필기 8문제, 분개 8문제를 완료하면 단원 마스터가 완료됩니다. (집중 심화 훈련)' };
+        }
+        if (sId === 'sec_closing') {
+            return { reqT: 8, reqJ: 10, desc: '필기 8문제, 분개 10문제를 완료하면 결산 마스터가 완료됩니다. (수동/자동결산 집중 훈련)' };
+        }
+        if (sId === 'sec_account_master') {
+            return { reqT: 15, reqJ: 0, desc: '금액 없이 계정과목을 3초 만에 판별하는 스피드 훈련 15문제를 완료하면 계정 마스터가 완료됩니다. (500번대/800번대/혼동계정 집중)' };
+        }
+        if (sId === 'sec_grade1_only') {
+            return { reqT: 10, reqJ: 10, desc: '필기 10문제, 분개 10문제를 완료하면 1급 초격차 마스터가 완료됩니다. (1급 Only & 2급 사각지대 완벽 총정리)' };
+        }
+        return { reqT: 6, reqJ: 6, desc: '필기 6문제, 분개 6문제를 완료하면 단원이 마스터됩니다.' };
+    }
+
     function escapeHtml(str) {
         if (!str) return '';
         return String(str)
@@ -601,14 +617,6 @@ window.LearningEngine = (function() {
         let acquiredWeightAll = 0;
         let completedSectionsCount = 0;
 
-        function getSectionTargets(sId) {
-            if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8 };
-            if (sId === 'sec_closing') return { reqT: 8, reqJ: 10 };
-            if (sId === 'sec_account_master') return { reqT: 15, reqJ: 0 };
-            if (sId === 'sec_grade1_only') return { reqT: 10, reqJ: 10 };
-            return { reqT: 6, reqJ: 6 };
-        }
-
         curriculum.sections.forEach(sec => {
             const counts = (prog.correct_counts && prog.correct_counts[sec.id]) || { theory: 0, journal: 0 };
             const targets = getSectionTargets(sec.id);
@@ -828,15 +836,6 @@ window.LearningEngine = (function() {
 
         const prog = (window.LearningAuth && window.LearningAuth.getProgress) ? window.LearningAuth.getProgress() || {} : {};
         const counts = (prog.correct_counts && prog.correct_counts[sectionId]) || { theory: 0, journal: 0 };
-
-        function getSectionTargets(sId) {
-            if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8, desc: '필기 8문제, 분개 8문제를 완료하면 단원 마스터가 완료됩니다. (집중 심화 훈련)' };
-            if (sId === 'sec_closing') return { reqT: 8, reqJ: 10, desc: '필기 8문제, 분개 10문제를 완료하면 결산 마스터가 완료됩니다. (수동/자동결산 집중 훈련)' };
-            if (sId === 'sec_account_master') return { reqT: 15, reqJ: 0, desc: '금액 없이 계정과목을 3초 만에 판별하는 스피드 훈련 15문제를 완료하면 계정 마스터가 완료됩니다. (500번대/800번대/혼동계정 집중)' };
-            if (sId === 'sec_grade1_only') return { reqT: 10, reqJ: 10, desc: '필기 10문제, 분개 10문제를 완료하면 1급 초격차 마스터가 완료됩니다. (1급 Only & 2급 사각지대 완벽 총정리)' };
-            return { reqT: 6, reqJ: 6, desc: '필기 6문제, 분개 6문제를 완료하면 단원이 마스터됩니다.' };
-        }
-
         const targets = getSectionTargets(sectionId);
         let hasTheory = targets.reqT > 0;
         let hasJournal = targets.reqJ > 0;
@@ -846,7 +845,7 @@ window.LearningEngine = (function() {
         let tCorrect = counts.theory || 0;
         let jCorrect = counts.journal || 0;
         
-        const isSectionAllDone = (tCorrect >= targetT) && (jCorrect >= targetJ);
+        const isSectionAllDone = (tCorrect >= targetT) && (targetJ === 0 || jCorrect >= targetJ);
         const isLastStep = currentStepIdx === section.steps.length - 1;
 
         let uiHtml = `
@@ -1011,14 +1010,6 @@ window.LearningEngine = (function() {
                 </div>
             `;
         } else if (phase === 'quiz') {
-            function getSectionTargets(sId) {
-                if (sId === 'sec_cost' || sId === 'sec_vat') return { reqT: 8, reqJ: 8, desc: '필기 8문제, 분개 8문제를 완료하면 단원 마스터가 완료됩니다. (집중 심화 훈련)' };
-                if (sId === 'sec_closing') return { reqT: 8, reqJ: 10, desc: '필기 8문제, 분개 10문제를 완료하면 결산 마스터가 완료됩니다. (수동/자동결산 집중 훈련)' };
-                if (sId === 'sec_account_master') return { reqT: 15, reqJ: 0, desc: '금액 없이 계정과목을 3초 만에 판별하는 스피드 훈련 15문제를 완료하면 계정 마스터가 완료됩니다. (500번대/800번대/혼동계정 집중)' };
-                if (sId === 'sec_grade1_only') return { reqT: 10, reqJ: 10, desc: '필기 10문제, 분개 10문제를 완료하면 1급 초격차 마스터가 완료됩니다. (1급 Only & 2급 사각지대 완벽 총정리)' };
-                return { reqT: 6, reqJ: 6, desc: '필기 6문제, 분개 6문제를 완료하면 단원이 마스터됩니다.' };
-            }
-
             const targets = getSectionTargets(sectionId);
             targetT = targets.reqT;
             targetJ = targets.reqJ;
@@ -2013,7 +2004,10 @@ window.LearningEngine = (function() {
 
         if (isCorrect) theoryCorrect++;
 
-        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
+        const targets = getSectionTargets(sectionId);
+        const reqT = targets.reqT;
+        const reqJ = targets.reqJ;
+        const isSectionCompleted = (theoryCorrect >= reqT) && (reqJ === 0 || journalCorrect >= reqJ);
 
         await saveProgress(stepId, sectionId, isCorrect, 'theory', isSectionCompleted, {
             id: step.quiz.id,
@@ -2094,7 +2088,10 @@ window.LearningEngine = (function() {
 
         if (isCorrect) theoryCorrect++;
 
-        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
+        const targets = getSectionTargets(sectionId);
+        const reqT = targets.reqT;
+        const reqJ = targets.reqJ;
+        const isSectionCompleted = (theoryCorrect >= reqT) && (reqJ === 0 || journalCorrect >= reqJ);
 
         await saveProgress(stepId, sectionId, isCorrect, 'theory', isSectionCompleted, {
             id: currentExtraQuiz.id,
@@ -2209,7 +2206,10 @@ window.LearningEngine = (function() {
 
         if (isCorrect) journalCorrect++;
 
-        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
+        const targets = getSectionTargets(sectionId);
+        const reqT = targets.reqT;
+        const reqJ = targets.reqJ;
+        const isSectionCompleted = (theoryCorrect >= reqT) && (reqJ === 0 || journalCorrect >= reqJ);
 
         await saveProgress(stepId, sectionId, isCorrect, 'journal', isSectionCompleted, {
             id: step.journalQuiz.id,
@@ -2311,7 +2311,10 @@ window.LearningEngine = (function() {
 
         if (isCorrect) journalCorrect++;
 
-        const isSectionCompleted = (theoryCorrect >= 6) && (journalCorrect >= 6);
+        const targets = getSectionTargets(sectionId);
+        const reqT = targets.reqT;
+        const reqJ = targets.reqJ;
+        const isSectionCompleted = (theoryCorrect >= reqT) && (reqJ === 0 || journalCorrect >= reqJ);
 
         await saveProgress(stepId, sectionId, isCorrect, 'journal', isSectionCompleted, {
             id: currentExtraQuiz.id,
@@ -2345,7 +2348,15 @@ window.LearningEngine = (function() {
                 if (quizType === 'journal') curJ++;
             }
 
-            const sPct = Math.round(((Math.min(6, curT) + Math.min(6, curJ)) / 12) * 100);
+            const targets = getSectionTargets(sectionId);
+            const reqT = targets.reqT;
+            const reqJ = targets.reqJ;
+            const maxScore = reqT + reqJ;
+
+            const cappedT = Math.min(reqT, curT);
+            const cappedJ = Math.min(reqJ, curJ);
+            const sPct = maxScore > 0 ? Math.round(((cappedT + cappedJ) / maxScore) * 100) : 0;
+            const isCompleted = (cappedT >= reqT) && (reqJ === 0 || cappedJ >= reqJ);
 
             const res = await fetch('?action=learning_save_step', {
                 method: 'POST',
@@ -2355,7 +2366,7 @@ window.LearningEngine = (function() {
                     section_id: sectionId,
                     quiz_type: quizType,
                     is_correct: isCorrect,
-                    is_step_completed: (curT >= 6 && curJ >= 6),
+                    is_step_completed: isCompleted,
                     section_pct: sPct, 
                     wrong_data: isCorrect ? null : wrongData
                 })
@@ -2378,8 +2389,9 @@ window.LearningEngine = (function() {
         const section = curriculum.sections.find(s => s.id === sectionId);
         if (!section) return;
 
-        const reqT = section.steps.some(st => st.quiz) ? 6 : 0;
-        const reqJ = section.steps.some(st => st.journalQuiz) ? 6 : 0;
+        const targets = getSectionTargets(sectionId);
+        const reqT = targets.reqT;
+        const reqJ = targets.reqJ;
         const tCorrect = counts.theory || 0;
         const jCorrect = counts.journal || 0;
 

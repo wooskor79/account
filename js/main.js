@@ -54,12 +54,20 @@ function updateGradeUI() {
     }
     if (quizBtn) {
         if (currentGrade === 'grade1') {
-            quizBtn.innerHTML = '⭐ 1급문제풀이 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+            quizBtn.innerHTML = '⭐ <span id="quiz-menu-text">1급문제풀이</span> <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
             quizBtn.style.color = '#eab308';
         } else {
-            quizBtn.innerHTML = '✨ 2급문제풀이 <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
+            quizBtn.innerHTML = '✨ <span id="quiz-menu-text">2급문제풀이</span> <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>';
             quizBtn.style.color = 'var(--accounting-point)';
         }
+    }
+    const videoBtn = document.getElementById('video-menu-btn');
+    const videoBtnText = document.getElementById('video-btn-text');
+    if (videoBtnText) {
+        videoBtnText.textContent = currentGrade === 'grade1' ? '1급영상보기' : '2급영상보기';
+    }
+    if (videoBtn) {
+        videoBtn.style.color = currentGrade === 'grade1' ? '#3b82f6' : '#6366f1';
     }
     if (itemsGrade2 && itemsGrade1) {
         if (currentGrade === 'grade1') {
@@ -310,6 +318,9 @@ function renderLoginSection() {
             : `<button class="btn btn-status-public" onclick="togglePrivateMode()" title="클릭 시 '비공개' 모드로 전환됩니다.">🌐 공개 모드</button>`;
 
         sec.innerHTML = `
+            <button class="btn btn-member-manage" onclick="openMemberAdminModal()" style="background:#4f46e5; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem;" title="전체 회원 및 맞춤학습/영상 시청 현황 관리">
+                👥 회원관리
+            </button>
             ${privateBtnHtml}
             <button class="btn btn-logout" onclick="logout()">로그아웃</button>
         `;
@@ -822,19 +833,68 @@ function closeLearningCourseApp() {
     }
 }
 
-// goHome 글로벌 확장 (학습 뷰도 함께 닫고 메인으로)
+// --- 1급 / 2급 영상 강의실 (Video Course) 라우팅 ---
+function toggleVideoMenu() {
+    const dropdown = document.getElementById('video-menu-dropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+}
+
+function openVideoAppView(grade = null, path = '') {
+    const targetGrade = grade || currentGrade || 'grade2';
+    const dropdown = document.getElementById('video-menu-dropdown');
+    if (dropdown) dropdown.classList.add('hidden');
+
+    if (window.VideoEngine && typeof window.VideoEngine.checkAuthAndOpenView === 'function') {
+        window.VideoEngine.checkAuthAndOpenView(targetGrade, path);
+    } else if (window.VideoEngine && typeof window.VideoEngine.openVideoAppView === 'function') {
+        window.VideoEngine.openVideoAppView(targetGrade, path);
+    }
+}
+
+function closeVideoAppView() {
+    if (window.VideoEngine && typeof window.VideoEngine.closeVideoAppView === 'function') {
+        window.VideoEngine.closeVideoAppView();
+    }
+}
+
+document.addEventListener('click', function(event) {
+    const wrapper = document.getElementById('video-dropdown-wrapper');
+    const dropdown = document.getElementById('video-menu-dropdown');
+    if (wrapper && dropdown && !wrapper.contains(event.target)) {
+        dropdown.classList.add('hidden');
+    }
+});
+
+// goHome 글로벌 확장 (학습 뷰 및 영상 뷰도 함께 닫고 메인으로)
 const origGoHome = window.goHome;
 window.goHome = function() {
     document.body.classList.remove('learning-app-active');
+    document.body.classList.remove('video-app-active');
+
     const learningView = document.getElementById('learning-course-view');
     if (learningView) {
         learningView.classList.add('hidden');
         learningView.style.display = 'none';
     }
+
+    const videoView = document.getElementById('video-course-view');
+    if (videoView) {
+        videoView.classList.add('hidden');
+        videoView.style.display = 'none';
+    }
+
+    if (window.VideoEngine && typeof window.VideoEngine.closeVideoPlayerModal === 'function') {
+        window.VideoEngine.closeVideoPlayerModal();
+    }
+
     const mainView = document.getElementById('main-content-view');
     if (mainView) {
         mainView.style.display = ''; // 인라인 display 스타일 제거!
+        mainView.classList.remove('hidden');
     }
+
     if (typeof origGoHome === 'function') {
         origGoHome();
     } else {
@@ -843,10 +903,458 @@ window.goHome = function() {
             quizView.classList.add('hidden');
             quizView.style.display = 'none';
         }
-        if (mainView) {
-            mainView.classList.remove('hidden');
-        }
     }
 };
+
+// =========================================================================
+// 관리자 전용 회원관리 및 학습/영상 통계 통합 모달 로직
+// =========================================================================
+let memberAdminData = null;
+let currentAdminTab = 'overview';
+
+function openMemberAdminModal() {
+    const modal = document.getElementById('member-admin-modal');
+    if (modal) modal.style.display = 'flex';
+    fetchAndRenderMemberAdmin();
+}
+
+function closeMemberAdminModal(e) {
+    if (e && e.target && e.target.closest && e.target.closest('#member-admin-container')) return;
+    const modal = document.getElementById('member-admin-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchMemberAdminTab(tab) {
+    currentAdminTab = tab;
+    const btnOverview = document.getElementById('admin-tab-btn-overview');
+    const btnVideos = document.getElementById('admin-tab-btn-videos');
+
+    if (tab === 'overview') {
+        if (btnOverview) { btnOverview.classList.add('bg-indigo-600', 'text-white'); btnOverview.classList.remove('text-slate-400'); }
+        if (btnVideos) { btnVideos.classList.remove('bg-indigo-600', 'text-white'); btnVideos.classList.add('text-slate-400'); }
+    } else {
+        if (btnVideos) { btnVideos.classList.add('bg-indigo-600', 'text-white'); btnVideos.classList.remove('text-slate-400'); }
+        if (btnOverview) { btnOverview.classList.remove('bg-indigo-600', 'text-white'); btnOverview.classList.add('text-slate-400'); }
+    }
+
+    if (memberAdminData) {
+        renderMemberAdminBody(memberAdminData);
+    }
+}
+
+async function fetchAndRenderMemberAdmin() {
+    const body = document.getElementById('member-admin-body');
+    if (!body) return;
+
+    body.innerHTML = `
+        <div class="py-16 text-center text-slate-400">
+            <div class="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="font-bold text-xs text-slate-300">회원 현황 데이터를 불러오는 중입니다...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch('?action=learning_admin_stats');
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || '데이터를 불러오지 못했습니다.');
+        }
+        memberAdminData = data;
+        renderMemberAdminBody(data);
+    } catch(err) {
+        body.innerHTML = `
+            <div class="p-8 text-center bg-rose-950/60 rounded-2xl border border-rose-800/60 text-white">
+                <div class="text-rose-400 font-bold text-sm mb-2">❌ 회원 데이터 로딩 실패</div>
+                <p class="text-xs text-rose-300 mb-4">${err.message}</p>
+                <button onclick="fetchAndRenderMemberAdmin()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow">다시 시도</button>
+            </div>
+        `;
+    }
+}
+
+function renderMemberAdminBody(data) {
+    const body = document.getElementById('member-admin-body');
+    if (!body) return;
+
+    const summary = data.summary || {};
+    const users = data.users || [];
+
+    // 상단 4대 요약 카드
+    const summaryHtml = `
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+                <div class="text-[11px] font-bold text-slate-400 mb-1">👥 총 가입 학습자</div>
+                <div class="text-2xl font-black text-white">${summary.total_users || 0}<span class="text-xs font-normal text-slate-400 ml-1">명</span></div>
+            </div>
+            <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+                <div class="text-[11px] font-bold text-slate-400 mb-1">📈 맞춤학습 평균 진도율</div>
+                <div class="text-2xl font-black text-emerald-400">${summary.avg_progress || 0}<span class="text-xs font-normal text-emerald-300 ml-1">%</span></div>
+            </div>
+            <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+                <div class="text-[11px] font-bold text-slate-400 mb-1">📝 퀴즈 풀이 / 정답률</div>
+                <div class="text-2xl font-black text-amber-400">${(summary.total_solved || 0).toLocaleString()}<span class="text-xs font-bold text-sky-400 ml-1.5">(${summary.overall_accuracy || 0}%)</span></div>
+            </div>
+            <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800">
+                <div class="text-[11px] font-bold text-slate-400 mb-1">🎬 영상 시청 / 완료 건수</div>
+                <div class="text-2xl font-black text-indigo-400">${summary.total_video_watched || 0}<span class="text-xs font-bold text-emerald-400 ml-1.5">(${summary.total_video_completed || 0}건 완료)</span></div>
+            </div>
+        </div>
+    `;
+
+    if (currentAdminTab === 'overview') {
+        // 1. 학습자별 종합 현황 테이블
+        body.innerHTML = `
+            ${summaryHtml}
+            <div class="bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden">
+                <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                    <h4 class="font-extrabold text-sm text-white flex items-center gap-2">
+                        <span>📋</span> 회원별 학습 진도 및 활동 현황 (${users.length}명)
+                    </h4>
+                    <span class="text-[11px] text-slate-400">행을 클릭하면 단원별 상세 내역을 확인합니다.</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
+                                <th class="p-3">#</th>
+                                <th class="p-3">학습자명</th>
+                                <th class="p-3">가입일 / 최근접속</th>
+                                <th class="p-3">맞춤학습 진도율</th>
+                                <th class="p-3">푼 문제 (정답률)</th>
+                                <th class="p-3">영상 시청수</th>
+                                <th class="p-3">오답노트</th>
+                                <th class="p-3 text-right">상세조회</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60" id="member-admin-table-body">
+                            ${users.length === 0 ? `
+                                <tr><td colspan="8" class="p-8 text-center text-slate-500 font-bold">등록된 회원이 없습니다.</td></tr>
+                            ` : users.map((u, idx) => `
+                                <tr class="hover:bg-slate-800/50 transition cursor-pointer member-row" data-username="${u.username}" onclick="openUserDetailPopup('${u.id}')">
+                                    <td class="p-3 text-slate-400 font-mono">${idx + 1}</td>
+                                    <td class="p-3 font-extrabold text-white flex items-center gap-1.5">
+                                        <span>👤</span> <span>${u.username}</span>
+                                    </td>
+                                    <td class="p-3 text-slate-400">
+                                        <div class="text-[11px] text-slate-300">${u.created_at ? u.created_at.split('T')[0] : '-'}</div>
+                                        <div class="text-[10px] text-slate-500">최근: ${u.last_login ? u.last_login.split('T')[0] : '-'}</div>
+                                    </td>
+                                    <td class="p-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-16 bg-slate-800 h-2 rounded-full overflow-hidden">
+                                                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full" style="width: ${u.total_pct}%"></div>
+                                            </div>
+                                            <span class="font-extrabold text-emerald-400 font-mono">${u.total_pct}%</span>
+                                        </div>
+                                    </td>
+                                    <td class="p-3 font-mono">
+                                        <span class="font-bold text-white">${u.solved_count}</span>
+                                        <span class="text-[11px] text-sky-400 font-bold ml-1">(${u.accuracy}%)</span>
+                                    </td>
+                                    <td class="p-3">
+                                        <span class="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-800 rounded-md font-bold text-[11px]">
+                                            🎬 ${u.video_stats ? u.video_stats.watched_count : 0}강 (${u.video_stats ? u.video_stats.completed_count : 0}완료)
+                                        </span>
+                                    </td>
+                                    <td class="p-3">
+                                        ${u.unresolved_wrong_count > 0 ? `
+                                            <span class="px-2 py-0.5 bg-rose-950 text-rose-300 border border-rose-800 rounded-md font-bold text-[11px]">
+                                                🚨 ${u.unresolved_wrong_count}개
+                                            </span>
+                                        ` : `
+                                            <span class="text-emerald-400 text-[11px] font-bold">완료됨</span>
+                                        `}
+                                    </td>
+                                    <td class="p-3 text-right">
+                                        <button class="px-2.5 py-1 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg font-bold text-[11px] transition" onclick="event.stopPropagation(); openUserDetailPopup('${u.id}')">
+                                            상세 ➜
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    } else {
+        // 2. 영상 시청 상세 기록 뷰
+        body.innerHTML = `
+            ${summaryHtml}
+            <div class="space-y-4">
+                <div class="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 flex items-center justify-between">
+                    <h4 class="font-extrabold text-sm text-white flex items-center gap-2">
+                        <span>🎬</span> 회원별 영상 시청 및 북마크 상세 기록
+                    </h4>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${users.map(u => {
+                        const vItems = u.video_items || [];
+                        return `
+                            <div class="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 member-video-card" data-username="${u.username}">
+                                <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-800">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-7 h-7 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center font-bold text-xs">👤</span>
+                                        <span class="font-black text-sm text-white">${u.username}</span>
+                                    </div>
+                                    <span class="text-xs text-slate-400 font-bold">
+                                        시청 ${vItems.length}편 / 완료 ${u.video_stats ? u.video_stats.completed_count : 0}편
+                                    </span>
+                                </div>
+
+                                ${vItems.length === 0 ? `
+                                    <div class="py-6 text-center text-slate-500 text-xs font-medium">아직 시청한 영상 기록이 없습니다.</div>
+                                ` : `
+                                    <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                        ${vItems.map(v => {
+                                            const pct = v.duration > 0 ? Math.min(100, Math.round((v.position / v.duration) * 100)) : 0;
+                                            const formatT = (sec) => {
+                                                const s = Math.floor(sec || 0);
+                                                const m = Math.floor(s / 60);
+                                                const remS = s % 60;
+                                                return `${m < 10 ? '0' : ''}${m}:${remS < 10 ? '0' : ''}${remS}`;
+                                            };
+                                            return `
+                                                <div class="p-2.5 bg-slate-900/80 rounded-xl border border-slate-800/80 text-xs">
+                                                    <div class="flex items-start justify-between gap-2">
+                                                        <div class="font-extrabold text-slate-200 truncate flex-1" title="${v.title}">
+                                                            ${v.title}
+                                                        </div>
+                                                        <span class="px-1.5 py-0.5 ${v.completed ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-indigo-950 text-indigo-300 border border-indigo-800'} text-[10px] font-bold rounded shrink-0">
+                                                            ${v.completed ? '✅ 수강완료' : `${pct}% 시청`}
+                                                        </span>
+                                                    </div>
+                                                    <div class="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
+                                                        <span>⏱️ ${formatT(v.position)} / ${formatT(v.duration)}</span>
+                                                        ${v.bookmarks && v.bookmarks.length > 0 ? `
+                                                            <span class="text-amber-400 font-bold">📌 북마크 ${v.bookmarks.length}개</span>
+                                                        ` : ''}
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                `}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+}
+
+function filterMemberAdminList(keyword) {
+    const q = (keyword || '').trim().toLowerCase();
+    const rows = document.querySelectorAll('.member-row, .member-video-card');
+    rows.forEach(el => {
+        const name = (el.getAttribute('data-username') || '').toLowerCase();
+        if (!q || name.includes(q)) {
+            el.style.display = '';
+        } else {
+            el.style.display = 'none';
+        }
+    });
+}
+
+let selectedAdminUser = null;
+let currentDetailSubTab = 'sections';
+
+function openUserDetailPopup(userId) {
+    if (!memberAdminData || !memberAdminData.users) return;
+    const user = memberAdminData.users.find(u => u.id === userId);
+    if (!user) return;
+
+    selectedAdminUser = user;
+    currentDetailSubTab = 'sections';
+
+    const modal = document.getElementById('member-detail-modal');
+    const header = document.getElementById('member-detail-header');
+    if (!modal || !header) return;
+
+    header.innerHTML = `
+        <div class="flex items-center gap-3">
+            <span class="w-10 h-10 rounded-2xl bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-black text-sm">
+                👤
+            </span>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-base font-extrabold text-white">${escapeHtml(user.username)}님의 맞춤학습 & 영상 상세 기록</h3>
+                    <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-bold rounded-full border border-emerald-500/30">
+                        달성률 ${user.total_pct}%
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mt-0.5">
+                    가입일: ${user.created_at ? user.created_at.split('T')[0] : '-'} | 푼 문제: <strong>${user.solved_count}개</strong> (정답률 ${user.accuracy}%) | 오답: <strong>${user.wrong_count}개</strong> | 영상: <strong>${user.video_stats ? user.video_stats.watched_count : 0}편</strong>
+                </p>
+            </div>
+        </div>
+        <button class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white flex items-center justify-center transition font-bold" onclick="closeUserDetailPopup()">
+            &times;
+        </button>
+    `;
+
+    switchUserDetailSubTab('sections');
+    modal.style.display = 'flex';
+}
+
+function closeUserDetailPopup(e) {
+    if (e && e.target && e.target.closest && e.target.closest('#member-detail-container')) return;
+    const modal = document.getElementById('member-detail-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchUserDetailSubTab(subtab) {
+    currentDetailSubTab = subtab;
+    const btnSec = document.getElementById('user-subtab-btn-sections');
+    const btnWrong = document.getElementById('user-subtab-btn-wrong');
+    const btnVid = document.getElementById('user-subtab-btn-videos');
+
+    [btnSec, btnWrong, btnVid].forEach(b => {
+        if (b) { b.classList.remove('bg-indigo-600', 'text-white'); b.classList.add('text-slate-400'); }
+    });
+
+    if (subtab === 'sections' && btnSec) { btnSec.classList.add('bg-indigo-600', 'text-white'); btnSec.classList.remove('text-slate-400'); }
+    else if (subtab === 'wrong' && btnWrong) { btnWrong.classList.add('bg-indigo-600', 'text-white'); btnWrong.classList.remove('text-slate-400'); }
+    else if (subtab === 'videos' && btnVid) { btnVid.classList.add('bg-indigo-600', 'text-white'); btnVid.classList.remove('text-slate-400'); }
+
+    renderUserDetailSubTabContent();
+}
+
+function renderUserDetailSubTabContent() {
+    const body = document.getElementById('member-detail-body');
+    if (!body || !selectedAdminUser) return;
+    const user = selectedAdminUser;
+
+    if (currentDetailSubTab === 'sections') {
+        // 1. 9대 단원별 진도율 카드
+        const curriculum = window.LearningCurriculum ? window.LearningCurriculum.sections : [];
+        const details = user.section_details || {};
+
+        body.innerHTML = `
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                ${curriculum.map(sec => {
+                    const d = details[sec.id] || { pct: 0, is_complete: false, theory_count: 0, journal_count: 0 };
+                    return `
+                        <div class="p-3.5 rounded-2xl border ${d.is_complete ? 'bg-emerald-950/40 border-emerald-700/60' : 'bg-slate-950/80 border-slate-800'} text-xs">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="font-extrabold text-white truncate flex-1" title="${sec.title}">${sec.title}</span>
+                                ${d.is_complete ? '<span class="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded">완료 ✨</span>' : `<span class="font-extrabold text-indigo-400">${d.pct}%</span>`}
+                            </div>
+                            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-2">
+                                <div class="h-full rounded-full ${d.is_complete ? 'bg-emerald-400' : 'bg-indigo-500'}" style="width: ${d.pct}%"></div>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-slate-400">
+                                <span>📝 필기: <strong>${d.theory_count}회</strong></span>
+                                ${sec.id === 'sec_account_master' ? '<span>⚡ 3초 판별</span>' : `<span>🧾 분개: <strong>${d.journal_count}회</strong></span>`}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    } else if (currentDetailSubTab === 'wrong') {
+        // 2. 오답노트 상세 이력
+        const wrongs = user.wrong_notes || [];
+        if (wrongs.length === 0) {
+            body.innerHTML = `
+                <div class="py-12 text-center text-slate-500 text-xs font-bold">
+                    🎉 등록된 오답이 없습니다. 모든 문제를 완벽히 맞혔거나 오답을 모두 해결했습니다!
+                </div>
+            `;
+            return;
+        }
+
+        body.innerHTML = `
+            <div class="space-y-3">
+                <div class="text-xs font-bold text-slate-400 flex items-center justify-between px-1">
+                    <span>총 ${wrongs.length}개의 오답 기록</span>
+                    <span class="text-rose-400 font-bold">미해결: ${user.unresolved_wrong_count}개</span>
+                </div>
+                ${wrongs.map((wn, idx) => `
+                    <div class="p-4 bg-slate-950/80 rounded-2xl border ${wn.resolved ? 'border-slate-800 opacity-60' : 'border-rose-900/60'} text-xs space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="px-2 py-0.5 ${wn.type === 'journal' ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'} text-[10px] font-extrabold rounded">
+                                ${wn.type === 'journal' ? '분개문제' : '필기문제'}
+                            </span>
+                            <span class="text-[11px] font-bold ${wn.resolved ? 'text-emerald-400' : 'text-rose-400'}">
+                                ${wn.resolved ? '✅ 해결완료' : '🚨 미해결 오답'}
+                            </span>
+                        </div>
+                        <div class="font-bold text-slate-200 leading-relaxed">
+                            ${escapeHtml(wn.question || wn.prompt || '문제 내용')}
+                        </div>
+                        ${wn.explanation ? `
+                            <div class="p-2.5 bg-slate-900 rounded-xl text-[11px] text-slate-300 border border-slate-800 leading-relaxed">
+                                <span class="font-bold text-indigo-400">💡 해설:</span> ${escapeHtml(wn.explanation)}
+                            </div>
+                        ` : ''}
+                        <div class="text-[10px] text-slate-500 text-right">
+                            오답 등록일: ${wn.created_at ? wn.created_at.split('T')[0] : '-'}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        // 3. 영상 시청 상세 목록
+        const videos = user.video_items || [];
+        if (videos.length === 0) {
+            body.innerHTML = `
+                <div class="py-12 text-center text-slate-500 text-xs font-bold">
+                    🎬 아직 시청한 영상 기록이 없습니다.
+                </div>
+            `;
+            return;
+        }
+
+        const formatT = (sec) => {
+            const s = Math.floor(sec || 0);
+            const m = Math.floor(s / 60);
+            const remS = s % 60;
+            return `${m < 10 ? '0' : ''}${m}:${remS < 10 ? '0' : ''}${remS}`;
+        };
+
+        body.innerHTML = `
+            <div class="space-y-3">
+                <div class="text-xs font-bold text-slate-400 px-1">
+                    총 ${videos.length}편의 강의 시청 (완료 ${user.video_stats ? user.video_stats.completed_count : 0}편)
+                </div>
+                ${videos.map(v => {
+                    const pct = v.duration > 0 ? Math.min(100, Math.round((v.position / v.duration) * 100)) : 0;
+                    return `
+                        <div class="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-xs space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="font-black text-sm text-white truncate flex-1" title="${v.title}">
+                                    ${v.title}
+                                </div>
+                                <span class="px-2 py-0.5 ${v.completed ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-indigo-950 text-indigo-300 border border-indigo-800'} text-[10px] font-bold rounded shrink-0">
+                                    ${v.completed ? '✅ 수강완료' : `${pct}% 시청`}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between text-[11px] text-slate-400">
+                                <span>⏱️ 시청 위치: <strong>${formatT(v.position)}</strong> / ${formatT(v.duration)}</span>
+                                <span>최근 시청: ${v.updated_at ? v.updated_at.split('T')[0] : '-'}</span>
+                            </div>
+                            <!-- 북마크 메모 리스트 -->
+                            ${v.bookmarks && v.bookmarks.length > 0 ? `
+                                <div class="mt-2 pt-2 border-t border-slate-900 space-y-1">
+                                    <div class="text-[10px] font-extrabold text-amber-400">📌 타임스탬프 북마크 메모 (${v.bookmarks.length}개):</div>
+                                    ${v.bookmarks.map(bm => `
+                                        <div class="flex items-center gap-2 text-[11px] text-slate-300 bg-slate-900 px-2.5 py-1 rounded-lg">
+                                            <span class="font-mono text-indigo-400 font-bold">${formatT(bm.time)}</span>
+                                            <span class="truncate">${escapeHtml(bm.note)}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+}
 
 window.onload = init;

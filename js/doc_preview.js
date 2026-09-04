@@ -6,6 +6,45 @@
 let currentPreviewWorkbook = null;
 let isLandscapeMode = true;
 let currentDocColumns = 3; // 기본 가로 3단 뷰
+let currentImgZoom = 1;
+let docDragPos = { startX: 0, startY: 0, initialLeft: 0, initialTop: 0, isDragging: false };
+let docResizePos = { startX: 0, startY: 0, initialWidth: 0, initialHeight: 0, isResizing: false };
+
+function resetDocModalGeometry() {
+    const modalContent = document.getElementById('doc-modal-content');
+    if (!modalContent) return;
+    modalContent.style.position = '';
+    modalContent.style.left = '';
+    modalContent.style.top = '';
+    modalContent.style.width = '';
+    modalContent.style.height = '';
+    modalContent.style.margin = '';
+    modalContent.style.transform = '';
+}
+
+function zoomDocImage(delta) {
+    const imgElement = document.getElementById('preview-img-element');
+    const zoomLevelEl = document.getElementById('doc-zoom-level');
+    if (!imgElement) return;
+    
+    currentImgZoom = Math.max(0.4, Math.min(4.0, +(currentImgZoom + delta).toFixed(1)));
+    imgElement.style.transform = `scale(${currentImgZoom})`;
+    if (zoomLevelEl) {
+        zoomLevelEl.textContent = `${Math.round(currentImgZoom * 100)}%`;
+    }
+}
+
+function resetDocImageZoom() {
+    const imgElement = document.getElementById('preview-img-element');
+    const zoomLevelEl = document.getElementById('doc-zoom-level');
+    currentImgZoom = 1;
+    if (imgElement) {
+        imgElement.style.transform = 'scale(1)';
+    }
+    if (zoomLevelEl) {
+        zoomLevelEl.textContent = '100%';
+    }
+}
 
 async function openDocumentPreview(fileId, encodedFilename, category) {
     const filename = decodeURIComponent(encodedFilename);
@@ -17,6 +56,7 @@ async function openDocumentPreview(fileId, encodedFilename, category) {
     const downloadBtn = document.getElementById('preview-btn-download');
     const sheetTabs = document.getElementById('preview-sheet-tabs');
     const loadingEl = document.getElementById('preview-loading');
+    const zoomControls = document.getElementById('preview-img-zoom-controls');
     
     const pdfFrame = document.getElementById('preview-pdf-frame');
     const imgContainer = document.getElementById('preview-img-container');
@@ -26,12 +66,16 @@ async function openDocumentPreview(fileId, encodedFilename, category) {
     
     if (!modal) return;
     
-    // 리셋
+    // 리셋 및 지오메트리 초기화
+    resetDocModalGeometry();
+    resetDocImageZoom();
+    
     badgeEl.className = 'badge-ext ' + (getFileBadge(ext).match(/badge-[a-z]+/)?.[0] || 'badge-default');
     badgeEl.textContent = ext.toUpperCase();
     titleEl.textContent = filename;
     downloadBtn.href = `?action=download&id=${fileId}&grade=${encodeURIComponent(currentGrade)}`;
     
+    if (zoomControls) zoomControls.style.display = 'none';
     sheetTabs.style.display = 'none';
     sheetTabs.innerHTML = '';
     pdfFrame.style.display = 'none';
@@ -50,6 +94,7 @@ async function openDocumentPreview(fileId, encodedFilename, category) {
     
     try {
         if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+            if (zoomControls) zoomControls.style.display = 'inline-flex';
             imgElement.src = streamUrl;
             imgElement.onload = () => {
                 loadingEl.style.display = 'none';
@@ -60,6 +105,17 @@ async function openDocumentPreview(fileId, encodedFilename, category) {
                 docContainer.innerHTML = `<div class="p-8 text-center text-slate-500">이미지를 불러올 수 없습니다.</div>`;
                 docContainer.style.display = 'block';
             };
+            
+            if (imgContainer && !imgContainer._hasWheelListener) {
+                imgContainer._hasWheelListener = true;
+                imgContainer.addEventListener('wheel', (e) => {
+                    if (imgContainer.style.display !== 'none') {
+                        e.preventDefault();
+                        const delta = e.deltaY < 0 ? 0.15 : -0.15;
+                        zoomDocImage(delta);
+                    }
+                }, { passive: false });
+            }
         } else if (ext === 'pdf') {
             pdfFrame.src = streamUrl;
             loadingEl.style.display = 'none';
@@ -380,10 +436,14 @@ function closePreviewModal(e) {
     const imgElement = document.getElementById('preview-img-element');
     const orientBtn = document.getElementById('preview-btn-orientation');
     const colControls = document.getElementById('preview-col-controls');
+    const zoomControls = document.getElementById('preview-img-zoom-controls');
     if (pdfFrame) pdfFrame.src = '';
     if (imgElement) imgElement.src = '';
     if (orientBtn) orientBtn.style.display = 'none';
     if (colControls) colControls.style.display = 'none';
+    if (zoomControls) zoomControls.style.display = 'none';
+    resetDocImageZoom();
+    resetDocModalGeometry();
     if (modal) modal.style.display = 'none';
 }
 
@@ -395,46 +455,133 @@ function closeVideoModal(e) {
     closePreviewModal(e);
 }
 
+// --- 문서/그림 모달 드래그 이동 시작 ---
+function startDocModalDrag(e) {
+    if (!e) return;
+    if (e.target && e.target.closest && e.target.closest('button, select, input, a, .btn-modal-close, .btn-col-btn, .btn-modal-action')) return;
+    
+    const modalContent = document.getElementById('doc-modal-content');
+    const modalHeader = document.getElementById('doc-modal-header');
+    if (!modalContent || !modalHeader) return;
+    
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    e.preventDefault();
+    
+    const rect = modalContent.getBoundingClientRect();
+    modalContent.style.position = 'fixed';
+    modalContent.style.left = `${rect.left}px`;
+    modalContent.style.top = `${rect.top}px`;
+    modalContent.style.margin = '0';
+    modalContent.style.transform = 'none';
+    
+    docDragPos.startX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    docDragPos.startY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    docDragPos.initialLeft = rect.left;
+    docDragPos.initialTop = rect.top;
+    docDragPos.isDragging = true;
+    modalHeader.classList.add('is-dragging');
+    
+    const onMouseMove = (moveEvent) => {
+        if (!docDragPos.isDragging) return;
+        moveEvent.preventDefault();
+        const clientX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientX : 0);
+        const clientY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientY : 0);
+        const deltaX = clientX - docDragPos.startX;
+        const deltaY = clientY - docDragPos.startY;
+        
+        let nextLeft = docDragPos.initialLeft + deltaX;
+        let nextTop = docDragPos.initialTop + deltaY;
+        
+        // 뷰포트 안전 경계
+        const minLeft = 10;
+        const maxLeft = Math.max(minLeft, window.innerWidth - modalContent.offsetWidth - 10);
+        const minTop = 10;
+        const maxTop = Math.max(minTop, window.innerHeight - 60);
+        
+        nextLeft = Math.max(minLeft, Math.min(maxLeft, nextLeft));
+        nextTop = Math.max(minTop, Math.min(maxTop, nextTop));
+        
+        modalContent.style.left = `${nextLeft}px`;
+        modalContent.style.top = `${nextTop}px`;
+    };
+    
+    const onMouseUp = () => {
+        docDragPos.isDragging = false;
+        modalHeader.classList.remove('is-dragging');
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.removeEventListener('touchmove', onMouseMove);
+        document.removeEventListener('touchend', onMouseUp);
+    };
+    
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchmove', onMouseMove, { passive: false });
+    document.addEventListener('touchend', onMouseUp);
+}
+
+// --- 문서/그림 모달 우하단 크기 조절 시작 ---
+function startDocModalResize(e) {
+    if (!e) return;
+    const modalContent = document.getElementById('doc-modal-content');
+    if (!modalContent) return;
+    
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = modalContent.getBoundingClientRect();
+    modalContent.style.position = 'fixed';
+    modalContent.style.left = `${rect.left}px`;
+    modalContent.style.top = `${rect.top}px`;
+    modalContent.style.margin = '0';
+    modalContent.style.transform = 'none';
+    
+    docResizePos.startX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    docResizePos.startY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    docResizePos.initialWidth = rect.width;
+    docResizePos.initialHeight = rect.height;
+    docResizePos.isResizing = true;
+    
+    const onResizeMove = (moveEvent) => {
+        if (!docResizePos.isResizing) return;
+        moveEvent.preventDefault();
+        const clientX = moveEvent.clientX || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientX : 0);
+        const clientY = moveEvent.clientY || (moveEvent.touches && moveEvent.touches[0] ? moveEvent.touches[0].clientY : 0);
+        const deltaX = clientX - docResizePos.startX;
+        const deltaY = clientY - docResizePos.startY;
+        
+        let newW = docResizePos.initialWidth + deltaX;
+        let newH = docResizePos.initialHeight + deltaY;
+        
+        // 최소/최대 크기 제한
+        newW = Math.max(340, Math.min(window.innerWidth - rect.left - 10, newW));
+        newH = Math.max(250, Math.min(window.innerHeight - rect.top - 10, newH));
+        
+        modalContent.style.width = `${newW}px`;
+        modalContent.style.maxWidth = '98vw';
+        modalContent.style.height = `${newH}px`;
+        modalContent.style.maxHeight = '98vh';
+    };
+    
+    const onResizeUp = () => {
+        docResizePos.isResizing = false;
+        document.removeEventListener('mousemove', onResizeMove);
+        document.removeEventListener('mouseup', onResizeUp);
+        document.removeEventListener('touchmove', onResizeMove);
+        document.removeEventListener('touchend', onResizeUp);
+    };
+    
+    document.addEventListener('mousemove', onResizeMove);
+    document.addEventListener('mouseup', onResizeUp);
+    document.addEventListener('touchmove', onResizeMove, { passive: false });
+    document.addEventListener('touchend', onResizeUp);
+}
+
 function initModalDrag() {
-    const modalHeader = document.getElementById('modal-header');
-    const modalContent = document.getElementById('modal-content');
-    
-    if (!modalHeader || !modalContent) return;
-    
-    let isDragging = false;
-    let startX = 0, startY = 0;
-    let initialLeft = 0, initialTop = 0;
-    
-    modalHeader.addEventListener('mousedown', (e) => {
-        if (e.target.classList.contains('modal-close') || e.target.closest('.modal-close')) return;
-        
-        isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        
-        const rect = modalContent.getBoundingClientRect();
-        initialLeft = rect.left;
-        initialTop = rect.top;
-        
-        modalContent.style.transform = 'none';
-        modalContent.style.left = initialLeft + 'px';
-        modalContent.style.top = initialTop + 'px';
-        
-        document.addEventListener('mousemove', onDrag);
-        document.addEventListener('mouseup', stopDrag);
-    });
-    
-    function onDrag(e) {
-        if (!isDragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        modalContent.style.left = (initialLeft + dx) + 'px';
-        modalContent.style.top = (initialTop + dy) + 'px';
-    }
-    
-    function stopDrag() {
-        isDragging = false;
-        document.removeEventListener('mousemove', onDrag);
-        document.removeEventListener('mouseup', stopDrag);
-    }
+    const modalHeader = document.getElementById('doc-modal-header') || document.getElementById('modal-header');
+    if (!modalHeader) return;
+    modalHeader.removeEventListener('mousedown', startDocModalDrag);
+    modalHeader.addEventListener('mousedown', startDocModalDrag);
+    modalHeader.addEventListener('touchstart', startDocModalDrag, { passive: false });
 }

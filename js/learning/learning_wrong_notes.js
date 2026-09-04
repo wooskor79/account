@@ -47,6 +47,8 @@ window.LearningWrongNotes = (function() {
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_cost', this)">⚙️ 원가회계</button>
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_vat', this)">🧾 부가가치세</button>
                 <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_closing', this)">🎯 결산마스터</button>
+                <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_account_master', this)">⚡ 계정마스터</button>
+                <button class="filter-tab-btn" onclick="LearningWrongNotes.filterNotes('sec_grade1_only', this)">🚀 1급초격차</button>
             </div>
 
             <!-- 오답 카드 목록 -->
