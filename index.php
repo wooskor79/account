@@ -9,8 +9,8 @@ header("Pragma: no-cache");
 
 $site_settings = get_site_settings();
 $is_private = (bool)$site_settings['is_private'];
-$is_admin = isset($_SESSION['admin']) && $_SESSION['admin'] === true;
 $is_learning_user = isset($_SESSION['learning_user']) && !empty($_SESSION['learning_user']);
+$is_admin = (isset($_SESSION['admin']) && $_SESSION['admin'] === true) || ($is_learning_user && !empty($_SESSION['learning_user']['is_admin']));
 $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
 ?>
 <!DOCTYPE html>
@@ -1245,6 +1245,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 const res = await fetch('api.php?action=learning_login', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
+                    credentials: 'same-origin',
                     body: JSON.stringify({username, password})
                 });
                 const data = await res.json();
@@ -1290,6 +1291,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 const res = await fetch('api.php?action=learning_register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
+                    credentials: 'same-origin',
                     body: JSON.stringify({username, password, password_confirm})
                 });
                 const data = await res.json();

@@ -1361,6 +1361,7 @@ if ($action) {
         $stmt = $pdo->prepare("INSERT IGNORE INTO learning_stats (user_id, grade, subject) VALUES (:uid, 'grade1', 'default'), (:uid2, 'grade2', 'default')");
         $stmt->execute([':uid' => $user_id, ':uid2' => $user_id]);
 
+        session_write_close(); // 세션 저장 즉시 완료
         echo json_encode([
             'success' => true,
             'message' => '회원가입이 완료되었습니다!',
@@ -1431,6 +1432,7 @@ if ($action) {
             $log_stmt->execute([':uid' => $user['id'], ':ip' => $ip_address]);
         }
 
+        session_write_close(); // 세션 저장 즉시 완료
         echo json_encode([
             'success' => true,
             'message' => '로그인 성공!',
