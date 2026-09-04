@@ -10,7 +10,8 @@ header("Pragma: no-cache");
 $site_settings = get_site_settings();
 $is_private = (bool)$site_settings['is_private'];
 $is_admin = isset($_SESSION['admin']) && $_SESSION['admin'] === true;
-$show_lock_gate = $is_private && !$is_admin;
+$is_learning_user = isset($_SESSION['learning_user']) && !empty($_SESSION['learning_user']);
+$show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
 ?>
 <!DOCTYPE html>
 <html lang="ko">
@@ -1253,11 +1254,10 @@ $show_lock_gate = $is_private && !$is_admin;
                 const data = await res.json();
                 
                 if(data.success) {
-                    alert("회원가입이 완료되었습니다!\n이제 로그인 해보세요.");
-                    this.switchTab('login');
-                    document.getElementById('auth-login-username').value = username;
-                    document.getElementById('auth-login-password').value = '';
-                    document.getElementById('auth-login-password').focus();
+                    window.sessionStorage.setItem('learning_username', username);
+                    if(typeof syncUserName === 'function') syncUserName(username);
+                    alert("회원가입 완료! 자동으로 로그인되었습니다.");
+                    location.reload();
                 } else {
                     errEl.innerText = data.message;
                     errEl.classList.remove('hidden');
