@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 1급 맞춤 코스 학습용 간편 회원가입 / 로그인 / 세션 관리 모듈
  */
 window.LearningAuth = (function() {
@@ -84,10 +84,12 @@ window.LearningAuth = (function() {
 
     async function logout() {
         try {
-            await fetch('?action=learning_logout');
+            await fetch('api.php?action=learning_logout');
         } catch (e) {}
         currentUser = null;
         currentProgress = null;
+        window.sessionStorage.removeItem('learning_username');
+        location.reload();
     }
 
     function getUser() {

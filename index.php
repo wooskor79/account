@@ -1312,6 +1312,19 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
             }
         }
     };
+
+    // PHP 세션 쿠키 유실(나스 환경/시크릿 모드)에 대비한 강력한 2차 방어막 (SessionStorage 기반 게이트 해제)
+    document.addEventListener('DOMContentLoaded', () => {
+        const storedUser = window.sessionStorage.getItem('learning_username');
+        if (storedUser) {
+            const gate = document.getElementById('site-lock-gate');
+            if (gate) {
+                gate.classList.add('hidden');
+                // 기존 이름 연동 함수가 있다면 호출
+                if(typeof syncUserName === 'function') syncUserName(storedUser);
+            }
+        }
+    });
     </script>
 </body>
 </html>
