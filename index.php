@@ -242,9 +242,12 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호</label>
-                    <input type="password" id="auth-login-password" placeholder="비밀번호 입력" 
-                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition"
-                        autocomplete="current-password">
+                    <div class="relative">
+                        <input type="password" id="auth-login-password" placeholder="비밀번호 입력" 
+                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition"
+                            autocomplete="current-password">
+                        <button type="button" onclick="AuthEngine.togglePassword('auth-login-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-70 hover:opacity-100 transition" title="비밀번호 보기/숨기기">🙈</button>
+                    </div>
                 </div>
                 <p id="auth-login-error" class="text-xs text-rose-500 font-semibold mt-2 text-center hidden"></p>
                 <button type="submit" 
@@ -262,13 +265,20 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호 (4자리 이상)</label>
-                    <input type="password" id="auth-reg-password" placeholder="비밀번호 입력" 
-                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                    <div class="relative">
+                        <input type="password" id="auth-reg-password" placeholder="비밀번호 입력" oninput="AuthEngine.checkPasswordMatch()"
+                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                        <button type="button" onclick="AuthEngine.togglePassword('auth-reg-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-70 hover:opacity-100 transition" title="비밀번호 보기/숨기기">🙈</button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호 확인</label>
-                    <input type="password" id="auth-reg-password-confirm" placeholder="비밀번호 다시 입력" 
-                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                    <div class="relative">
+                        <input type="password" id="auth-reg-password-confirm" placeholder="비밀번호 다시 입력" oninput="AuthEngine.checkPasswordMatch()"
+                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                        <button type="button" onclick="AuthEngine.togglePassword('auth-reg-password-confirm', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-70 hover:opacity-100 transition" title="비밀번호 보기/숨기기">🙈</button>
+                    </div>
+                    <p id="auth-reg-match-msg" class="text-[11px] font-bold mt-1.5 ml-1 hidden"></p>
                 </div>
                 <p id="auth-reg-error" class="text-xs text-rose-500 font-semibold mt-2 text-center hidden"></p>
                 <button type="submit" 
@@ -1163,6 +1173,37 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
     <!-- 통합 인증(로그인/회원가입) 엔진 -->
     <script>
     const AuthEngine = {
+        togglePassword: function(inputId, btn) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🐵';
+            } else {
+                input.type = 'password';
+                btn.textContent = '🙈';
+            }
+        },
+
+        checkPasswordMatch: function() {
+            const pw = document.getElementById('auth-reg-password').value;
+            const pwc = document.getElementById('auth-reg-password-confirm').value;
+            const msg = document.getElementById('auth-reg-match-msg');
+            
+            if (!pw && !pwc) {
+                msg.classList.add('hidden');
+                return;
+            }
+            
+            msg.classList.remove('hidden');
+            if (pw !== pwc) {
+                msg.textContent = '❌ 비밀번호가 일치하지 않습니다.';
+                msg.className = 'text-[11px] font-bold mt-1.5 ml-1 text-rose-500';
+            } else {
+                msg.textContent = '✅ 비밀번호가 일치합니다.';
+                msg.className = 'text-[11px] font-bold mt-1.5 ml-1 text-emerald-500';
+            }
+        },
+
         switchTab: function(tabName) {
             const loginForm = document.getElementById('auth-login-form');
             const regForm = document.getElementById('auth-register-form');
