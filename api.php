@@ -1695,7 +1695,7 @@ if ($action) {
             $wrong_notes = $u_prog['wrong_notes'] ?? [];
 
             // 기출문제(일반 퀴즈) 통계 병합
-            $q_stmt = $pdo->prepare("SELECT SUM(total_solved) as t_sol, SUM(total_correct) as t_cor FROM learning_stats WHERE user_id = :uid");
+            $q_stmt = $pdo->prepare("SELECT SUM(total_solved) as t_sol, SUM(correct_count) as t_cor FROM learning_stats WHERE user_id = :uid");
             $q_stmt->execute([':uid' => $uid]);
             $q_res = $q_stmt->fetch();
             $quiz_solved = (int)($q_res['t_sol'] ?? 0);
