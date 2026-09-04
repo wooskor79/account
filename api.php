@@ -6,13 +6,6 @@ ini_set('max_execution_time', '3600');
 ini_set('max_input_time', '3600');
 
 if (session_status() === PHP_SESSION_NONE) {
-    // 나스 환경 세션 권한 문제 및 쿠키 유실 방지
-    session_save_path(__DIR__ . '/data/sessions');
-    session_set_cookie_params([
-        'lifetime' => 86400 * 7,
-        'path' => '/',
-        'samesite' => 'Lax'
-    ]);
     @session_start();
 }
 

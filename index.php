@@ -1258,8 +1258,6 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                     // 기존 quiz 이름 연동
                     if(typeof syncUserName === 'function') syncUserName(username);
                     alert("로그인 성공! 환영합니다.");
-                    // 새로고침하여 상태 반영
-                    location.reload();
                 } else {
                     errEl.innerText = data.message;
                     errEl.classList.remove('hidden');
@@ -1300,7 +1298,8 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                     window.sessionStorage.setItem('learning_username', username);
                     if(typeof syncUserName === 'function') syncUserName(username);
                     alert("회원가입 완료! 자동으로 로그인되었습니다.");
-                    location.reload();
+                    const gate = document.getElementById('site-lock-gate');
+                    if (gate) gate.classList.add('hidden');
                 } else {
                     errEl.innerText = data.message;
                     errEl.classList.remove('hidden');
