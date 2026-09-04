@@ -312,23 +312,45 @@ async function unlockSite(e) {
 function renderLoginSection() {
     const sec = document.getElementById('login-section');
     if (!sec) return;
-    if (isAdmin) {
-        const privateBtnHtml = isPrivateMode
-            ? `<button class="btn btn-status-private" onclick="togglePrivateMode()" title="클릭 시 '공개' 모드로 전환됩니다.">🔒 비공개 모드</button>`
-            : `<button class="btn btn-status-public" onclick="togglePrivateMode()" title="클릭 시 '비공개' 모드로 전환됩니다.">🌐 공개 모드</button>`;
-
+    
+    const loggedUser = window.sessionStorage.getItem('learning_username');
+    // window.currentUser 가 없으면 sessionStorage 이름을 기반으로 간단히 표시 (API 상태 체크 전이라도)
+    const displayName = window.currentUser ? window.currentUser.username : loggedUser;
+    const isUserAdmin = window.currentUser ? window.currentUser.is_admin : isAdmin;
+    
+    if (displayName) {
+        // 로그인 상태
+        let adminHtml = '';
+        if (isUserAdmin || isAdmin) {
+            const privateBtnHtml = isPrivateMode
+                ? `<button class="btn btn-status-private" onclick="togglePrivateMode()" title="클릭 시 '공개' 모드로 전환됩니다.">🔒 비공개 모드</button>`
+                : `<button class="btn btn-status-public" onclick="togglePrivateMode()" title="클릭 시 '비공개' 모드로 전환됩니다.">🌐 공개 모드</button>`;
+            
+            adminHtml = `
+                <button class="btn btn-member-manage" onclick="openMemberAdminModal()" style="background:#4f46e5; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem;" title="회원 관리 대시보드">
+                    ⚙️ 관리자
+                </button>
+                ${privateBtnHtml}
+            `;
+        }
+        
         sec.innerHTML = `
-            <button class="btn btn-member-manage" onclick="openMemberAdminModal()" style="background:#4f46e5; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem;" title="전체 회원 및 맞춤학습/영상 시청 현황 관리">
-                👥 회원관리
-            </button>
-            ${privateBtnHtml}
-            <button class="btn btn-logout" onclick="logout()">로그아웃</button>
+            <div style="display:flex; align-items:center; gap: 10px;">
+                ${adminHtml}
+                <div style="font-size: 0.9rem; font-weight: 700; color: #475569;">
+                    반갑습니다, <span style="color: #6366f1;">${displayName}</span>님 🌿
+                </div>
+                <button onclick="alert('곧 제공될 기능입니다!\\n나의 누적 학습량, 진도율, 오답노트를 모아서 볼 수 있습니다.')" style="background:#fffbeb; color:#d97706; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #fde68a; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background='#fffbeb'">
+                    📊 내 학습 현황
+                </button>
+                <button class="btn btn-logout" onclick="AuthEngine.logout()" style="background:#f1f5f9; color:#64748b; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #e2e8f0; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                    로그아웃
+                </button>
+            </div>
         `;
     } else {
-        sec.innerHTML = `
-            <input type="password" id="admin-pass" placeholder="관리자 비밀번호" onkeypress="if(event.key==='Enter') login()">
-            <button class="btn btn-primary" onclick="login()">관리자 로그인</button>
-        `;
+        // 비로그인 상태 (자물쇠 화면이 뜰 것이므로 여기는 빈칸으로 둬도 무방)
+        sec.innerHTML = ``;
     }
 }
 

@@ -538,7 +538,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
 
             <!-- 분개 Start Screen -->
             <div id="start-screen" class="text-center py-2 sm:py-3 space-y-3">
-                <div class="bg-amber-50/80 rounded-2xl p-4 sm:p-5 border border-amber-200 text-slate-800 shadow-sm max-w-md mx-auto">
+                <div class="bg-amber-50/80 rounded-2xl p-4 sm:p-5 border border-amber-200 text-slate-800 shadow-sm max-w-md mx-auto hidden">
                     <label for="quiz-user-name" class="block text-xs sm:text-sm font-bold text-amber-900 mb-1.5">
                         👤 사용자 이름을 적어주세요
                     </label>
@@ -656,7 +656,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
 
             <!-- 필기 Start Screen -->
             <div id="theory-start-screen" class="text-center py-2 sm:py-3 space-y-3">
-                <div class="bg-emerald-50/80 rounded-2xl p-4 sm:p-5 border border-emerald-200 text-slate-800 shadow-sm max-w-md mx-auto">
+                <div class="bg-emerald-50/80 rounded-2xl p-4 sm:p-5 border border-emerald-200 text-slate-800 shadow-sm max-w-md mx-auto hidden">
                     <label for="theory-quiz-user-name" class="block text-xs sm:text-sm font-bold text-emerald-900 mb-1.5">
                         👤 사용자 이름을 적어주세요
                     </label>
@@ -1255,8 +1255,8 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                     document.getElementById('site-lock-gate').classList.add('hidden');
                     window.currentUser = data.user;
                     window.sessionStorage.setItem('learning_username', username);
-                    // 기존 quiz 이름 연동
                     if(typeof syncUserName === 'function') syncUserName(username);
+                    if(typeof renderLoginSection === 'function') renderLoginSection();
                     alert("로그인 성공! 환영합니다.");
                 } else {
                     errEl.innerText = data.message;
@@ -1297,6 +1297,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 if(data.success) {
                     window.sessionStorage.setItem('learning_username', username);
                     if(typeof syncUserName === 'function') syncUserName(username);
+                    if(typeof renderLoginSection === 'function') renderLoginSection();
                     alert("회원가입 완료! 자동으로 로그인되었습니다.");
                     const gate = document.getElementById('site-lock-gate');
                     if (gate) gate.classList.add('hidden');
@@ -1309,6 +1310,16 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 errEl.textContent = '서버와 통신 중 오류가 발생했습니다.';
                 errEl.classList.remove('hidden');
             }
+        },
+
+        logout: async function() {
+            if (!confirm('로그아웃 하시겠습니까?')) return;
+            try {
+                await fetch('api.php?action=learning_logout');
+            } catch (e) {}
+            window.sessionStorage.removeItem('learning_username');
+            window.currentUser = null;
+            location.reload();
         }
     };
 
