@@ -5,6 +5,107 @@ let currentVideoFolder = '';
 let currentGrade = localStorage.getItem('current_grade') || 'grade2';
 let sectionTitles = {};
 
+// --- 커스텀 모달 UI 엔진 (alert, confirm 등) ---
+const CustomModal = (function() {
+    function init() {
+        if (document.getElementById('custom-modal-overlay')) return;
+        const html = `
+            <div id="custom-modal-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999999] hidden flex items-center justify-center p-4 transition-opacity opacity-0">
+                <div id="custom-modal-box" class="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-w-sm w-full transform scale-95 transition-all text-center">
+                    <div id="custom-modal-icon" class="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner"></div>
+                    <h3 id="custom-modal-title" class="text-xl font-bold text-slate-800 mb-2">알림</h3>
+                    <div id="custom-modal-msg" class="text-sm text-slate-600 mb-6 whitespace-pre-wrap leading-relaxed"></div>
+                    <div id="custom-modal-input-container" class="hidden mb-6">
+                        <input type="text" id="custom-modal-input" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 font-bold focus:ring-2 focus:ring-blue-500 outline-none text-center" placeholder="">
+                    </div>
+                    <div id="custom-modal-buttons" class="flex gap-2 justify-center"></div>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+    
+    function show({ title, msg, icon, iconBg, type = 'alert', inputPlaceholder = '', onConfirm, onCancel }) {
+        init();
+        const overlay = document.getElementById('custom-modal-overlay');
+        const box = document.getElementById('custom-modal-box');
+        const titleEl = document.getElementById('custom-modal-title');
+        const msgEl = document.getElementById('custom-modal-msg');
+        const iconEl = document.getElementById('custom-modal-icon');
+        const inputContainer = document.getElementById('custom-modal-input-container');
+        const inputEl = document.getElementById('custom-modal-input');
+        const btnContainer = document.getElementById('custom-modal-buttons');
+        
+        titleEl.textContent = title || '알림';
+        msgEl.textContent = msg || '';
+        iconEl.innerHTML = icon || '💡';
+        iconEl.className = `w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner ${iconBg || 'bg-blue-50 text-blue-500'}`;
+        
+        inputContainer.classList.add('hidden');
+        inputEl.value = '';
+        btnContainer.innerHTML = '';
+        
+        const close = (result = null) => {
+            overlay.classList.remove('opacity-100');
+            box.classList.remove('scale-100');
+            box.classList.add('scale-95');
+            setTimeout(() => { overlay.classList.add('hidden'); }, 200);
+            if (result !== null && onConfirm) onConfirm(result);
+            else if (result === null && onCancel) onCancel();
+        };
+
+        if (type === 'alert') {
+            const btn = document.createElement('button');
+            btn.className = 'flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition';
+            btn.textContent = '확인';
+            btn.onclick = () => close(true);
+            btnContainer.appendChild(btn);
+        } else if (type === 'confirm' || type === 'prompt') {
+            const btnCancel = document.createElement('button');
+            btnCancel.className = 'flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition';
+            btnCancel.textContent = '취소';
+            btnCancel.onclick = () => close(null);
+            
+            const btnConfirm = document.createElement('button');
+            btnConfirm.className = 'flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition';
+            btnConfirm.textContent = '확인';
+            
+            if (type === 'prompt') {
+                inputContainer.classList.remove('hidden');
+                inputEl.placeholder = inputPlaceholder;
+                inputEl.focus();
+                btnConfirm.onclick = () => close(inputEl.value);
+            } else {
+                btnConfirm.onclick = () => close(true);
+            }
+            
+            btnContainer.appendChild(btnCancel);
+            btnContainer.appendChild(btnConfirm);
+        }
+        
+        overlay.classList.remove('hidden');
+        setTimeout(() => {
+            overlay.classList.add('opacity-100');
+            box.classList.remove('scale-95');
+            box.classList.add('scale-100');
+            if(type === 'prompt') inputEl.focus();
+        }, 10);
+    }
+
+    return {
+        alert: (msg, title="알림") => new Promise(res => show({ msg, title, type: 'alert', onConfirm: res, onCancel: res })),
+        confirm: (msg, title="확인") => new Promise(res => show({ msg, title, icon: '❓', iconBg: 'bg-amber-50 text-amber-500', type: 'confirm', onConfirm: () => res(true), onCancel: () => res(false) })),
+        prompt: (msg, title="입력", placeholder="") => new Promise(res => show({ msg, title, icon: '✏️', iconBg: 'bg-emerald-50 text-emerald-500', type: 'prompt', inputPlaceholder: placeholder, onConfirm: res, onCancel: () => res(null) }))
+    };
+})();
+
+// 기본 alert, confirm 오버라이딩(주의: async 처리위해 await 필요)
+window.showAlert = CustomModal.alert;
+window.showConfirm = CustomModal.confirm;
+window.showPrompt = CustomModal.prompt;
+// ----------------------------------------------------
+
+
 function toggleGrade() {
     switchGrade(currentGrade === 'grade2' ? 'grade1' : 'grade2');
 }
@@ -322,15 +423,10 @@ function renderLoginSection() {
         // 로그인 상태
         let adminHtml = '';
         if (isUserAdmin || isAdmin) {
-            const privateBtnHtml = isPrivateMode
-                ? `<button class="btn btn-status-private" onclick="togglePrivateMode()" title="클릭 시 '공개' 모드로 전환됩니다.">🔒 비공개 모드</button>`
-                : `<button class="btn btn-status-public" onclick="togglePrivateMode()" title="클릭 시 '비공개' 모드로 전환됩니다.">🌐 공개 모드</button>`;
-            
             adminHtml = `
                 <button class="btn btn-member-manage" onclick="openMemberAdminModal()" style="background:#4f46e5; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem;" title="회원 관리 대시보드">
                     ⚙️ 관리자
                 </button>
-                ${privateBtnHtml}
             `;
         }
         
@@ -641,24 +737,26 @@ async function uploadFile(category) {
 
 
 async function deleteFile(id) {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const confirmed = await window.showConfirm('정말 삭제하시겠습니까?', '삭제 확인');
+    if (!confirmed) return;
     const res = await fetch(`?action=delete&id=${encodeURIComponent(id)}&grade=${encodeURIComponent(currentGrade)}`);
     if (res.ok) {
         await fetchFiles();
     } else {
-        alert('삭제 실패');
+        await window.showAlert('삭제 실패', '오류');
     }
 }
 
 async function deleteVideo(path) {
-    if (!confirm('정말 동영상을 삭제하시겠습니까?')) return;
+    const confirmed = await window.showConfirm('정말 동영상을 삭제하시겠습니까?', '삭제 확인');
+    if (!confirmed) return;
     let decodedPath = path;
     try { decodedPath = decodeURIComponent(path); } catch(e){}
     const res = await fetch(`?action=delete_video&path=${encodeURIComponent(decodedPath)}&grade=${encodeURIComponent(currentGrade)}`);
     if (res.ok) {
         await fetchVideos(currentVideoFolder);
     } else {
-        alert('삭제 실패');
+        await window.showAlert('삭제 실패', '오류');
     }
 }
 
@@ -946,20 +1044,32 @@ function closeMemberAdminModal(e) {
     if (modal) modal.style.display = 'none';
 }
 
-function switchMemberAdminTab(tab) {
+async function switchMemberAdminTab(tab) {
     currentAdminTab = tab;
     const btnOverview = document.getElementById('admin-tab-btn-overview');
     const btnVideos = document.getElementById('admin-tab-btn-videos');
+    const btnDownloads = document.getElementById('admin-tab-btn-downloads');
 
-    if (tab === 'overview') {
-        if (btnOverview) { btnOverview.classList.add('bg-indigo-600', 'text-white'); btnOverview.classList.remove('text-slate-400'); }
-        if (btnVideos) { btnVideos.classList.remove('bg-indigo-600', 'text-white'); btnVideos.classList.add('text-slate-400'); }
-    } else {
-        if (btnVideos) { btnVideos.classList.add('bg-indigo-600', 'text-white'); btnVideos.classList.remove('text-slate-400'); }
-        if (btnOverview) { btnOverview.classList.remove('bg-indigo-600', 'text-white'); btnOverview.classList.add('text-slate-400'); }
+    [btnOverview, btnVideos, btnDownloads].forEach(btn => {
+        if(btn) {
+            btn.classList.remove('bg-indigo-600', 'text-white');
+            btn.classList.add('text-slate-400');
+        }
+    });
+
+    let activeBtn = null;
+    if (tab === 'overview') activeBtn = btnOverview;
+    else if (tab === 'videos') activeBtn = btnVideos;
+    else if (tab === 'downloads') activeBtn = btnDownloads;
+    
+    if (activeBtn) {
+        activeBtn.classList.add('bg-indigo-600', 'text-white');
+        activeBtn.classList.remove('text-slate-400');
     }
 
-    if (memberAdminData) {
+    if (tab === 'downloads') {
+        renderDownloadLogs();
+    } else if (memberAdminData) {
         renderMemberAdminBody(memberAdminData);
     }
 }
@@ -1056,6 +1166,7 @@ function renderMemberAdminBody(data) {
                                     <td class="p-3 text-slate-400 font-mono">${idx + 1}</td>
                                     <td class="p-3 font-extrabold text-white flex items-center gap-1.5">
                                         <span>👤</span> <span>${u.username}</span>
+                                        ${u.is_blocked ? `<span class="px-1.5 py-0.5 bg-rose-600 text-white text-[10px] rounded" title="${u.block_reason}">차단됨</span>` : ''}
                                     </td>
                                     <td class="p-3 text-slate-400">
                                         <div class="text-[11px] text-slate-300">${u.created_at ? u.created_at.split('T')[0] : '-'}</div>
@@ -1088,9 +1199,14 @@ function renderMemberAdminBody(data) {
                                         `}
                                     </td>
                                     <td class="p-3 text-right">
-                                        <button class="px-2.5 py-1 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg font-bold text-[11px] transition" onclick="event.stopPropagation(); openUserDetailPopup('${u.id}')">
-                                            상세 ➜
-                                        </button>
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold text-[11px] transition" onclick="event.stopPropagation(); toggleUserBlock('${u.id}', ${u.is_blocked})">
+                                                ${u.is_blocked ? '차단해제' : '차단 🚫'}
+                                            </button>
+                                            <button class="px-2.5 py-1 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg font-bold text-[11px] transition" onclick="event.stopPropagation(); openUserDetailPopup('${u.id}')">
+                                                상세 ➜
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -1379,4 +1495,176 @@ function renderUserDetailSubTabContent() {
     }
 }
 
+
+// --- 내 학습 현황 모달 로직 ---
+async function openMyStatsModal() {
+    const modal = document.getElementById('my-stats-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.add('opacity-100');
+        modal.querySelector('div').classList.remove('scale-95');
+        modal.querySelector('div').classList.add('scale-100');
+    }, 10);
+    
+    const loggedUser = window.sessionStorage.getItem('learning_username');
+    const displayName = window.currentUser ? window.currentUser.username : loggedUser;
+    if (!displayName) {
+        document.getElementById('my-stats-content').innerHTML = '<div class="text-center py-8 text-rose-500 font-bold text-sm">로그인이 필요합니다.</div>';
+        return;
+    }
+    
+    document.getElementById('my-stats-username-display').textContent = displayName + ' 님의 통계';
+    
+    let progressHtml = '';
+    try {
+        const res = await fetch('api.php?action=learning_status');
+        const data = await res.json();
+        if (data.is_logged_in && data.progress) {
+            const prg = data.progress;
+            const solved = prg.stats ? prg.stats.solved_count : 0;
+            const correct = prg.stats ? prg.stats.correct_count : 0;
+            const acc = solved > 0 ? Math.round((correct / solved) * 100) : 0;
+            const steps = prg.completed_steps ? prg.completed_steps.length : 0;
+            progressHtml = `
+                <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex justify-between items-center">
+                    <div>
+                        <div class="text-xs font-bold text-indigo-400 mb-1">맞춤 코스 학습 진도</div>
+                        <div class="text-lg font-extrabold text-indigo-700">총 ${steps}개 스텝 완료</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold text-indigo-400 mb-1">정답률</div>
+                        <div class="text-lg font-extrabold text-indigo-700">${acc}% <span class="text-xs font-semibold text-indigo-500">(${correct}/${solved})</span></div>
+                    </div>
+                </div>
+            `;
+        }
+    } catch(e) {}
+    
+    let localHtml = '';
+    if (window.allHighScores) {
+        let itemsHtml = '';
+        for (const [key, val] of Object.entries(window.allHighScores)) {
+            if (val.name === displayName || val.name === '도전자') {
+                const label = key.replace('grade1', '1급').replace('grade2', '2급').replace('theory', '필기').replace('journal', '분개');
+                itemsHtml += `
+                    <div class="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100 mt-2">
+                        <span class="text-sm font-bold text-slate-700">${label}</span>
+                        <span class="text-sm font-extrabold text-blue-600">${val.score}점</span>
+                    </div>
+                `;
+            }
+        }
+        if (itemsHtml) {
+            localHtml = `
+                <div class="mt-4">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">기출문제 최고 기록</h3>
+                    ${itemsHtml}
+                </div>
+            `;
+        }
+    }
+    
+    const content = document.getElementById('my-stats-content');
+    if (!progressHtml && !localHtml) {
+        content.innerHTML = '<div class="text-center py-8 text-slate-500 font-semibold text-sm">아직 학습 기록이 없습니다.</div>';
+    } else {
+        content.innerHTML = progressHtml + localHtml;
+    }
+}
+
+function closeMyStatsModal() {
+    const modal = document.getElementById('my-stats-modal');
+    if (!modal) return;
+    modal.classList.remove('opacity-100');
+    modal.querySelector('div').classList.remove('scale-100');
+    modal.querySelector('div').classList.add('scale-95');
+    setTimeout(() => { modal.classList.add('hidden'); }, 200);
+}
+
+async function toggleUserBlock(userId, isBlocked) {
+    let reason = "";
+    if (!isBlocked) {
+        reason = await window.showPrompt("해당 사용자를 차단하시겠습니까?\n사유를 입력해주세요:", "계정 차단", "예: 부적절한 접근");
+        if (reason === null) return;
+    } else {
+        const confirmUnblock = await window.showConfirm("차단을 해제하시겠습니까?", "차단 해제");
+        if (!confirmUnblock) return;
+    }
+    
+    try {
+        const res = await fetch("?action=admin_block_user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ target_id: userId, is_blocked: isBlocked ? 0 : 1, block_reason: reason })
+        });
+        const data = await res.json();
+        if (data.success) {
+            await window.showAlert("처리되었습니다.", "성공");
+            fetchAndRenderMemberAdmin();
+        } else {
+            await window.showAlert("오류: " + data.message, "실패");
+        }
+    } catch(err) {
+        await window.showAlert("서버 통신 오류", "에러");
+    }
+}
+
+async function renderDownloadLogs() {
+    const body = document.getElementById('member-admin-body');
+    if (!body) return;
+    
+    body.innerHTML = `
+        <div class="py-16 text-center text-slate-400">
+            <div class="inline-block w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+            <p class="font-bold text-xs text-slate-300">다운로드 이력을 불러오는 중입니다...</p>
+        </div>
+    `;
+    
+    try {
+        const res = await fetch('?action=admin_download_logs');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || '오류 발생');
+        
+        const logs = data.logs || [];
+        
+        body.innerHTML = `
+            <div class="bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden mt-4">
+                <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+                    <h4 class="font-extrabold text-sm text-white flex items-center gap-2">
+                        <span>📥</span> 시스템 파일 다운로드 추적 로그
+                    </h4>
+                </div>
+                <div class="overflow-x-auto max-h-[600px]">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="sticky top-0 z-10 bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
+                            <tr>
+                                <th class="p-3">#</th>
+                                <th class="p-3">다운로드 일시</th>
+                                <th class="p-3">사용자명</th>
+                                <th class="p-3">파일명</th>
+                                <th class="p-3">접속 IP</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/60">
+                            ${logs.length === 0 ? '<tr><td colspan="5" class="p-8 text-center text-slate-500 font-bold">기록이 없습니다.</td></tr>' : logs.map((log, i) => `
+                                <tr class="hover:bg-slate-800/50 transition">
+                                    <td class="p-3 text-slate-500 font-mono">${logs.length - i}</td>
+                                    <td class="p-3 text-slate-300">${log.downloaded_at}</td>
+                                    <td class="p-3 font-extrabold text-indigo-400">${log.username || '비회원'}</td>
+                                    <td class="p-3 text-emerald-300 font-mono truncate max-w-xs" title="${log.file_path}">${log.file_path.split('/').pop()}</td>
+                                    <td class="p-3 text-slate-500 font-mono">${log.ip_address}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    } catch(err) {
+        body.innerHTML = `<div class="p-8 text-center text-rose-500 font-bold">${err.message}</div>`;
+    }
+}
+
 window.onload = init;
+
