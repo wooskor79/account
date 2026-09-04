@@ -303,8 +303,12 @@ async function init() {
     updateGradeUI();
     initializeViews(); 
     await checkLoginStatus();
+    // 페이지 로드/새로고침 시 PHP 세션에서 로그인 상태 복원
+    await restoreSessionFromServer();
     await fetchSectionTitles();
     await fetchFiles();
+    // 15분 idle 자동 로그아웃 타이머 시작
+    startIdleTimer();
     initResizer('resizer1', 'col1-sub-grid', 'card-drawing', 'col1-wrapper');
     initResizer('resizer2', 'card-seohee', 'card-heera', 'col2-wrapper');
     initModalDrag();
@@ -436,7 +440,7 @@ function renderLoginSection() {
                 <div style="font-size: 0.9rem; font-weight: 700; color: #475569;">
                     반갑습니다, <span style="color: #6366f1;">${displayName}</span>님 🌿
                 </div>
-                <button onclick="alert('곧 제공될 기능입니다!\\n나의 누적 학습량, 진도율, 오답노트를 모아서 볼 수 있습니다.')" style="background:#fffbeb; color:#d97706; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #fde68a; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background='#fffbeb'">
+                <button onclick="openMyStatsModal()" style="background:#fffbeb; color:#d97706; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #fde68a; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background='#fffbeb'">
                     📊 내 학습 현황
                 </button>
                 <button class="btn btn-logout" onclick="AuthEngine.logout()" style="background:#f1f5f9; color:#64748b; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #e2e8f0; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
@@ -1665,6 +1669,53 @@ async function renderDownloadLogs() {
         body.innerHTML = `<div class="p-8 text-center text-rose-500 font-bold">${err.message}</div>`;
     }
 }
+
+// --- 세션 복원 (새로고침 시 PHP 세션 기반으로 자동 로그인 유지) ---
+async function restoreSessionFromServer() {
+    try {
+        const res = await fetch('api.php?action=learning_status');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.is_logged_in && data.user) {
+            const username = data.user.username;
+            window.currentUser = data.user;
+            window.sessionStorage.setItem('learning_username', username);
+            renderLoginSection();
+            if (typeof syncUserName === 'function') syncUserName(username);
+        } else if (!data.is_logged_in) {
+            // PHP 세션이 만료된 경우 클라이언트 상태도 정리
+            window.currentUser = null;
+            window.sessionStorage.removeItem('learning_username');
+            renderLoginSection();
+        }
+    } catch(e) {
+        console.warn('세션 복원 실패:', e);
+    }
+}
+
+// --- 15분 idle 자동 로그아웃 타이머 ---
+let _idleTimer = null;
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15분
+
+function resetIdleTimer() {
+    clearTimeout(_idleTimer);
+    _idleTimer = setTimeout(async () => {
+        const username = window.sessionStorage.getItem('learning_username');
+        if (!username) return;
+        try { await fetch('api.php?action=learning_logout'); } catch(e) {}
+        window.currentUser = null;
+        window.sessionStorage.removeItem('learning_username');
+        renderLoginSection();
+        await window.showAlert('15분 이상 활동이 없어 자동으로 로그아웃되었습니다.', '자동 로그아웃');
+    }, IDLE_TIMEOUT_MS);
+}
+
+function startIdleTimer() {
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(evt => window.addEventListener(evt, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+}
+// -----------------------------------------------
 
 window.onload = init;
 

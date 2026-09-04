@@ -6,7 +6,21 @@ ini_set('max_execution_time', '3600');
 ini_set('max_input_time', '3600');
 
 if (session_status() === PHP_SESSION_NONE) {
+    // 세션 최대 유효시간 15분(900초) 설정
+    ini_set('session.gc_maxlifetime', 900);
+    session_set_cookie_params(900);
     @session_start();
+}
+
+// 로그인 세션 활동 시간 갱신 (15분 idle = 자동 로그아웃)
+if (isset($_SESSION['learning_user']) && isset($_SESSION['last_activity'])) {
+    if (time() - $_SESSION['last_activity'] > 900) {
+        unset($_SESSION['learning_user']);
+        unset($_SESSION['last_activity']);
+    }
+}
+if (isset($_SESSION['learning_user'])) {
+    $_SESSION['last_activity'] = time();
 }
 
 // .env 파일 로드 로직
@@ -1641,7 +1655,14 @@ if ($action) {
             exit(json_encode(['success' => false, 'message' => '관리자 권한이 필요합니다.']));
         }
 
-        $stmt = $pdo->query("SELECT id, username, created_at, last_login_at AS last_login, is_blocked, block_reason FROM users ORDER BY created_at DESC");
+        try {
+        // DB에서 유저 목록 조회 (is_blocked/block_reason 컬럼이 없을 경우 fallback)
+        try {
+            $stmt = $pdo->query("SELECT id, username, created_at, last_login_at AS last_login, is_blocked, block_reason FROM users ORDER BY created_at DESC");
+        } catch (Exception $e) {
+            // is_blocked/block_reason 컬럼이 없는 구버전 DB 대응
+            $stmt = $pdo->query("SELECT id, username, created_at, last_login_at AS last_login, 0 AS is_blocked, '' AS block_reason FROM users ORDER BY created_at DESC");
+        }
         $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $progress_data = atomic_json_read($learning_progress_file);
@@ -1797,9 +1818,11 @@ if ($action) {
             'users' => $user_list
         ], JSON_UNESCAPED_UNICODE);
         exit;
+        } catch (Exception $e) {
+            http_response_code(500);
+            exit(json_encode(['success' => false, 'message' => '통계 조회 중 오류: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE));
+        }
     }
-
-
 
     // 8) 관리자: 회원 차단/해제 API
     if ($action === 'admin_block_user') {
@@ -1819,10 +1842,13 @@ if ($action) {
             exit(json_encode(['success' => false, 'message' => '대상 ID가 없습니다.']));
         }
         
-        $stmt = $pdo->prepare("UPDATE users SET is_blocked = :blocked, block_reason = :reason WHERE id = :id");
-        $stmt->execute([':blocked' => $is_blocked, ':reason' => $block_reason, ':id' => $target_id]);
-        
-        exit(json_encode(['success' => true]));
+        try {
+            $stmt = $pdo->prepare("UPDATE users SET is_blocked = :blocked, block_reason = :reason WHERE id = :id");
+            $stmt->execute([':blocked' => $is_blocked, ':reason' => $block_reason, ':id' => $target_id]);
+            exit(json_encode(['success' => true]));
+        } catch (Exception $e) {
+            exit(json_encode(['success' => false, 'message' => '차단 처리 중 오류: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE));
+        }
     }
 
     // 9) 관리자: 다운로드 내역 조회 API
@@ -1834,14 +1860,19 @@ if ($action) {
             exit(json_encode(['success' => false, 'message' => '권한이 없습니다.']));
         }
         
-        $stmt = $pdo->query("
-            SELECT d.id, u.username, d.file_path, d.downloaded_at, d.ip_address 
-            FROM download_logs d 
-            LEFT JOIN users u ON d.user_id = u.id 
-            ORDER BY d.downloaded_at DESC 
-            LIMIT 500
-        ");
-        $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            // 신버전 스키마(file_path, downloaded_at) 우선
+            $stmt = $pdo->query("SELECT d.id, u.username, d.file_path, d.downloaded_at, d.ip_address FROM download_logs d LEFT JOIN users u ON d.user_id = u.id ORDER BY d.downloaded_at DESC LIMIT 500");
+            $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            try {
+                // 구버전 스키마(file_name, created_at) fallback
+                $stmt = $pdo->query("SELECT d.id, u.username, d.file_name AS file_path, d.created_at AS downloaded_at, d.ip_address FROM download_logs d LEFT JOIN users u ON d.user_id = u.id ORDER BY d.created_at DESC LIMIT 500");
+                $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (Exception $e2) {
+                $logs = []; // 테이블 없는 경우 빈 배열
+            }
+        }
         exit(json_encode(['success' => true, 'logs' => $logs]));
     }
 }

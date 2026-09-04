@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS `download_logs` (
   KEY `idx_downloaded_at` (`downloaded_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='파일 다운로드 이력';
 
+-- 기존 구버전 download_logs(file_name, created_at)가 있을 경우 새 컬럼 추가
+-- 이미 있는 경우 Note:#1060으로 무시됨
+ALTER TABLE `download_logs`
+  ADD COLUMN IF NOT EXISTS `file_path`     text     DEFAULT NULL   COMMENT '다운로드된 파일 경로',
+  ADD COLUMN IF NOT EXISTS `downloaded_at` datetime DEFAULT NULL   COMMENT '다운로드 시각';
+
 
 -- ---------------------------------------------------------
 -- 4. 학습 통계 (Learning Stats) 테이블
