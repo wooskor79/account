@@ -583,9 +583,6 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                         <span id="journal-difficulty-badge" class="hidden md:inline-block mobile-hidden bg-amber-100/80 text-amber-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">⚡ 난이도: -</span>
                         <span id="journal-accuracy-badge" class="hidden md:inline-block mobile-hidden bg-blue-100/80 text-blue-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🎯 정답률: -%</span>
                         <span id="journal-high-score-badge" class="hidden md:inline-block mobile-hidden bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🏆 최고기록: 불러오는 중...</span>
-                        <button type="button" onclick="openProblemReportModal('journal')" class="text-xs font-bold text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-2 py-0.5 rounded-md border border-slate-200 transition flex items-center gap-1 shadow-2xs" title="문제 오류 신고 시 관리자 검토 전까지 자동 격리됩니다">
-                            <span>🚨</span><span>오류신고</span>
-                        </button>
                     </div>
                     <div class="flex flex-col items-end gap-2 flex-shrink-0">
                         <button onclick="toggleCalculator()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-xl transition font-bold border border-indigo-200 shadow-sm whitespace-nowrap">🧮 계산기</button>
@@ -593,8 +590,15 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                     </div>
                 </div>
 
-                <div class="bg-slate-50 rounded-2xl p-5 mb-4 border border-slate-100 shadow-inner">
-                    <h3 id="problem-text" class="text-base font-medium text-slate-800 leading-relaxed"></h3>
+                <div class="bg-slate-50 rounded-2xl p-4 sm:p-5 mb-2.5 border border-slate-200/80 shadow-inner">
+                    <div id="problem-text" class="text-base font-semibold text-slate-800 leading-relaxed text-left"></div>
+                </div>
+
+                <!-- 문제와 분개입력창 사이 인라인 오류신고 바 -->
+                <div class="flex justify-end items-center mb-3">
+                    <button type="button" onclick="openProblemReportModal('journal')" class="btn-inline-problem-report" title="문제 오류 신고 시 관리자 검토 전까지 자동 격리됩니다">
+                        <span>🚨</span><span>문제 오류신고</span>
+                    </button>
                 </div>
 
                 <!-- 차변/대변 합계 및 차액 실시간 비교 요약 바 -->
@@ -710,9 +714,6 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                         <span id="theory-difficulty-badge" class="hidden md:inline-block mobile-hidden bg-emerald-100/80 text-emerald-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">⚡ 난이도: -</span>
                         <span id="theory-accuracy-badge" class="hidden md:inline-block mobile-hidden bg-blue-100/80 text-blue-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🎯 정답률: -%</span>
                         <span id="theory-high-score-badge" class="hidden md:inline-block mobile-hidden bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🏆 최고기록: 불러오는 중...</span>
-                        <button type="button" onclick="openProblemReportModal('theory')" class="text-xs font-bold text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-2 py-0.5 rounded-md border border-slate-200 transition flex items-center gap-1 shadow-2xs" title="문제 오류 신고 시 관리자 검토 전까지 자동 격리됩니다">
-                            <span>🚨</span><span>오류신고</span>
-                        </button>
                     </div>
                     <div class="flex flex-col items-end gap-2 flex-shrink-0">
                         <button onclick="toggleCalculator()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-xl transition font-bold border border-indigo-200 shadow-sm whitespace-nowrap">🧮 계산기</button>
@@ -720,11 +721,18 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                     </div>
                 </div>
 
-                <div class="bg-slate-50 rounded-2xl p-5 mb-6 border border-slate-100 shadow-inner">
-                    <h3 id="theory-problem-text" class="text-base font-medium text-slate-800 leading-relaxed whitespace-pre-wrap"></h3>
+                <div class="bg-slate-50 rounded-2xl p-4 sm:p-5 mb-2.5 border border-slate-200/80 shadow-inner">
+                    <div id="theory-problem-text" class="text-base font-semibold text-slate-800 leading-relaxed text-left"></div>
                 </div>
 
-                <div id="theory-choices-container" class="space-y-3 mb-4"></div>
+                <!-- 문제와 4지선다 보기 사이 인라인 오류신고 바 -->
+                <div class="flex justify-end items-center mb-3">
+                    <button type="button" onclick="openProblemReportModal('theory')" class="btn-inline-problem-report" title="문제 오류 신고 시 관리자 검토 전까지 자동 격리됩니다">
+                        <span>🚨</span><span>문제 오류신고</span>
+                    </button>
+                </div>
+
+                <div id="theory-choices-container" class="space-y-2 mb-4"></div>
 
                 <div class="hidden md:block text-xs text-emerald-700 bg-emerald-50/80 border border-emerald-200/80 rounded-xl py-2 px-3 text-center mb-4 font-semibold">
                     ⚡ 1~4 숫자키 또는 마우스로 선택 후 스페이스바(Space)를 누르면 정답이 확인됩니다.

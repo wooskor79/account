@@ -73,23 +73,11 @@ function formatTheoryQuestionHtml(rawText) {
         if (rows.length >= 2) {
             const headerRow = rows[0];
             const bodyRows = rows.slice(1);
-            const tableHtml = `
-                <div class="theory-table-container my-3">
-                    <table class="theory-table">
-                        <thead>
-                            <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
-                        </thead>
-                        <tbody>
-                            ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
             let res = '';
-            if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
-            res += tableHtml;
-            if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
-            return res;
+            if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
+            res += `<div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+            if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed text-left">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
+            return res.trim();
         }
     }
 
@@ -110,21 +98,7 @@ function formatTheoryQuestionHtml(rawText) {
                 for (let r = 0; r < rowCount; r++) {
                     bodyRows.push([dataItems[r], dataItems[r + 3], dataItems[r + 6]]);
                 }
-                return `
-                    <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
-                        ${escapeHtml(qMain).replace(/\n/g, '<br>')}
-                    </div>
-                    <div class="theory-table-container my-3">
-                        <table class="theory-table">
-                            <thead>
-                                <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
-                            </thead>
-                            <tbody>
-                                ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
+                return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
             }
         }
 
@@ -135,26 +109,12 @@ function formatTheoryQuestionHtml(rawText) {
             if (tableRows.length >= 2 && tableRows[0].length >= 2) {
                 const headerRow = tableRows[0];
                 const bodyRows = tableRows.slice(1);
-                return `
-                    <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
-                        ${escapeHtml(qMain).replace(/\n/g, '<br>')}
-                    </div>
-                    <div class="theory-table-container my-3">
-                        <table class="theory-table">
-                            <thead>
-                                <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
-                            </thead>
-                            <tbody>
-                                ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
+                return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
             }
         }
 
         // 2-C. 공통 <보기> 또는 조건 박스 (가. 나. 다. / ㄱ. ㄴ. ㄷ. / ㆍ 조건 등)
-        const isBogiLike = lines.some(l => /^(가|나|다|라|마|바|ㄱ|ㄴ|ㄷ|ㄹ|ㅁ|ㅂ|a|b|c|d|A|B|C|D)\.|\<보기\>|\[보기\]|【보기】|^ㆍ|^·|^\-/.test(l));
+        const isBogiLike = lines.some(l => /^(가|나|다|라|마|바|ㄱ|ㄴ|ㄷ|ㄹ|ㅁ|ㅂ|a|b|c|d|A|B|C|D)\.|\<보기\>|\[보기\]|【보기】|^ㆍ|^·|^\-|■/.test(l));
         if (isBogiLike || lines.length >= 2) {
             let boxTitle = '보 기';
             if (lines[0].includes('보기')) {
@@ -164,29 +124,22 @@ function formatTheoryQuestionHtml(rawText) {
             }
 
             const cleanLines = lines.filter(l => !/^[<>[\]【】\s]*보기[<>[\]【】\s]*$/i.test(l));
-            const isShortItems = cleanLines.every(l => l.length <= 25);
-            const gridClass = isShortItems && cleanLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5' : 'space-y-1.5';
+            const mergedLines = [];
+            for (let line of cleanLines) {
+                if (/^[:：\s]/.test(line) && mergedLines.length > 0) {
+                    mergedLines[mergedLines.length - 1] += ' ' + line.trim();
+                } else {
+                    mergedLines.push(line);
+                }
+            }
+            const isShortItems = mergedLines.every(l => l.length <= 28);
+            const gridClass = isShortItems && mergedLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1' : 'space-y-1';
 
-            return `
-                <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
-                    ${escapeHtml(qMain).replace(/\n/g, '<br>')}
-                </div>
-                <div class="theory-bogi-box my-3">
-                    <div class="theory-bogi-header">
-                        <span class="text-indigo-600">📋</span>
-                        <span>&lt;${escapeHtml(boxTitle)}&gt;</span>
-                    </div>
-                    <div class="theory-bogi-content ${gridClass}">
-                        ${cleanLines.map(line => `
-                            <div class="font-medium text-slate-700">${escapeHtml(line)}</div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
+            return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-bogi-box my-2"><div class="theory-bogi-header"><span class="text-indigo-600">📋</span><span>&lt;${escapeHtml(boxTitle)}&gt;</span></div><div class="theory-bogi-content ${gridClass}">${mergedLines.map(line => `<div class="font-medium text-slate-700">${escapeHtml(line)}</div>`).join('')}</div></div>`;
         }
     }
 
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    return `<div class="theory-question-main font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
 }
 
 function fetchTheoryExcelFile(url = '필기문제.xlsx') {
@@ -438,15 +391,15 @@ function renderCurrentTheoryProblem() {
     choiceItems.forEach((choice, idx) => {
         const choiceNum = idx + 1;
         const div = document.createElement('div');
-        div.className = `theory-choice-label flex items-start gap-3.5 p-4 rounded-2xl border-2 border-slate-100 bg-white hover:bg-slate-50/80 hover:border-slate-300 cursor-pointer transition shadow-2xs`;
+        div.className = `theory-choice-label flex items-start gap-2.5 py-2 px-3 sm:py-2.5 sm:px-3.5 rounded-xl border-2 border-slate-100 bg-white hover:bg-slate-50/80 hover:border-slate-300 cursor-pointer transition shadow-2xs`;
         div.dataset.num = choiceNum;
         
         div.innerHTML = `
-            <div class="flex items-center gap-2.5 mt-0.5 pointer-events-none">
+            <div class="flex items-center gap-2 mt-0.5 pointer-events-none flex-shrink-0">
                 <input type="radio" name="theory-choice" id="theory-choice-${choiceNum}" value="${choiceNum}" class="w-4 h-4 text-emerald-600 focus:ring-emerald-400">
-                <span class="w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 text-slate-700 font-extrabold text-xs group-hover:bg-slate-200">${choiceNum}</span>
+                <span class="w-5 h-5 flex items-center justify-center rounded-md bg-slate-100 text-slate-700 font-extrabold text-[11px] group-hover:bg-slate-200">${choiceNum}</span>
             </div>
-            <label for="theory-choice-${choiceNum}" class="flex-1 text-sm font-medium text-slate-700 cursor-pointer select-none leading-relaxed">${formatTheoryOptionHtml(choice.text)}</label>
+            <label for="theory-choice-${choiceNum}" class="flex-1 text-xs sm:text-sm font-medium text-slate-700 cursor-pointer select-none leading-snug">${formatTheoryOptionHtml(choice.text)}</label>
         `;
         
         div.addEventListener('click', () => {
@@ -475,14 +428,14 @@ function updateTheoryChoiceStyles() {
         const radio = label.querySelector('input[type="radio"]');
         const badge = label.querySelector('span');
         if (radio && radio.checked) {
-            label.className = `theory-choice-label flex items-start gap-3.5 p-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50/90 ring-2 ring-emerald-300/60 cursor-pointer transition shadow-sm`;
+            label.className = `theory-choice-label flex items-start gap-2.5 py-2 px-3 sm:py-2.5 sm:px-3.5 rounded-xl border-2 border-emerald-400 bg-emerald-50/90 ring-1 ring-emerald-300/60 cursor-pointer transition shadow-2xs`;
             if (badge) {
-                badge.className = `w-6 h-6 flex items-center justify-center rounded-lg bg-emerald-600 text-white font-extrabold text-xs shadow-2xs`;
+                badge.className = `w-5 h-5 flex items-center justify-center rounded-md bg-emerald-600 text-white font-extrabold text-[11px] shadow-2xs`;
             }
         } else {
-            label.className = `theory-choice-label flex items-start gap-3.5 p-4 rounded-2xl border-2 border-slate-100 bg-white hover:bg-slate-50/80 hover:border-slate-300 cursor-pointer transition shadow-2xs`;
+            label.className = `theory-choice-label flex items-start gap-2.5 py-2 px-3 sm:py-2.5 sm:px-3.5 rounded-xl border-2 border-slate-100 bg-white hover:bg-slate-50/80 hover:border-slate-300 cursor-pointer transition shadow-2xs`;
             if (badge) {
-                badge.className = `w-6 h-6 flex items-center justify-center rounded-lg bg-slate-100 text-slate-700 font-extrabold text-xs group-hover:bg-slate-200`;
+                badge.className = `w-5 h-5 flex items-center justify-center rounded-md bg-slate-100 text-slate-700 font-extrabold text-[11px] group-hover:bg-slate-200`;
             }
         }
     });

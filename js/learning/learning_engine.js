@@ -102,23 +102,11 @@ window.LearningEngine = (function() {
             if (rows.length >= 2) {
                 const headerRow = rows[0];
                 const bodyRows = rows.slice(1);
-                const tableHtml = `
-                    <div class="theory-table-container my-3">
-                        <table class="theory-table">
-                            <thead>
-                                <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
-                            </thead>
-                            <tbody>
-                                ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                `;
                 let res = '';
-                if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
-                res += tableHtml;
-                if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
-                return res;
+                if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
+                res += `<div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+                if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed text-left">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
+                return res.trim();
             }
         }
 
@@ -139,21 +127,7 @@ window.LearningEngine = (function() {
                     for (let r = 0; r < rowCount; r++) {
                         bodyRows.push([dataItems[r], dataItems[r + 3], dataItems[r + 6]]);
                     }
-                    return `
-                        <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
-                            ${escapeHtml(qMain).replace(/\n/g, '<br>')}
-                        </div>
-                        <div class="theory-table-container my-3">
-                            <table class="theory-table">
-                                <thead>
-                                    <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
-                                </thead>
-                                <tbody>
-                                    ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
+                    return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
                 }
             }
 
@@ -164,26 +138,12 @@ window.LearningEngine = (function() {
                 if (tableRows.length >= 2 && tableRows[0].length >= 2) {
                     const headerRow = tableRows[0];
                     const bodyRows = tableRows.slice(1);
-                    return `
-                        <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
-                            ${escapeHtml(qMain).replace(/\n/g, '<br>')}
-                        </div>
-                        <div class="theory-table-container my-3">
-                            <table class="theory-table">
-                                <thead>
-                                    <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
-                                </thead>
-                                <tbody>
-                                    ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    `;
+                    return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
                 }
             }
 
             // 2-C. 공통 <보기> 또는 조건 박스 (가. 나. 다. / ㄱ. ㄴ. ㄷ. / ㆍ 조건 등)
-            const isBogiLike = lines.some(l => /^(가|나|다|라|마|바|ㄱ|ㄴ|ㄷ|ㄹ|ㅁ|ㅂ|a|b|c|d|A|B|C|D)\.|\<보기\>|\[보기\]|【보기】|^ㆍ|^·|^\-/.test(l));
+            const isBogiLike = lines.some(l => /^(가|나|다|라|마|바|ㄱ|ㄴ|ㄷ|ㄹ|ㅁ|ㅂ|a|b|c|d|A|B|C|D)\.|\<보기\>|\[보기\]|【보기】|^ㆍ|^·|^\-|■/.test(l));
             if (isBogiLike || lines.length >= 2) {
                 let boxTitle = '보 기';
                 if (lines[0].includes('보기')) {
@@ -193,29 +153,22 @@ window.LearningEngine = (function() {
                 }
 
                 const cleanLines = lines.filter(l => !/^[<>[\]【】\s]*보기[<>[\]【】\s]*$/i.test(l));
-                const isShortItems = cleanLines.every(l => l.length <= 25);
-                const gridClass = isShortItems && cleanLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5' : 'space-y-1.5';
+                const mergedLines = [];
+                for (let line of cleanLines) {
+                    if (/^[:：\s]/.test(line) && mergedLines.length > 0) {
+                        mergedLines[mergedLines.length - 1] += ' ' + line.trim();
+                    } else {
+                        mergedLines.push(line);
+                    }
+                }
+                const isShortItems = mergedLines.every(l => l.length <= 28);
+                const gridClass = isShortItems && mergedLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1' : 'space-y-1';
 
-                return `
-                    <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
-                        ${escapeHtml(qMain).replace(/\n/g, '<br>')}
-                    </div>
-                    <div class="theory-bogi-box my-3">
-                        <div class="theory-bogi-header">
-                            <span class="text-indigo-600">📋</span>
-                            <span>&lt;${escapeHtml(boxTitle)}&gt;</span>
-                        </div>
-                        <div class="theory-bogi-content ${gridClass}">
-                            ${cleanLines.map(line => `
-                                <div class="font-medium text-slate-700">${escapeHtml(line)}</div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
+                return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-bogi-box my-2"><div class="theory-bogi-header"><span class="text-indigo-600">📋</span><span>&lt;${escapeHtml(boxTitle)}&gt;</span></div><div class="theory-bogi-content ${gridClass}">${mergedLines.map(line => `<div class="font-medium text-slate-700">${escapeHtml(line)}</div>`).join('')}</div></div>`;
             }
         }
 
-        return escapeHtml(text).replace(/\n/g, '<br>');
+        return `<div class="theory-question-main font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
     }
 
     async function initLearningApp() {
