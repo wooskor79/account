@@ -6,21 +6,52 @@ ini_set('max_execution_time', '3600');
 ini_set('max_input_time', '3600');
 
 if (session_status() === PHP_SESSION_NONE) {
-    // 세션 최대 유효시간 15분(900초) 설정
-    ini_set('session.gc_maxlifetime', 900);
-    session_set_cookie_params(900);
+    // 세션 파일 전용 저장 경로 지정 (서버 가비지 컬렉션 세션 삭제 방지)
+    $session_dir = __DIR__ . DIRECTORY_SEPARATOR . 'data' . DIRECTORY_SEPARATOR . 'sessions';
+    if (!file_exists($session_dir)) {
+        @mkdir($session_dir, 0777, true);
+    }
+    if (is_dir($session_dir) && is_writable($session_dir)) {
+        @session_save_path($session_dir);
+    }
+
+    ini_set('session.gc_maxlifetime', 86400);
+    ini_set('session.cookie_lifetime', 0);
+    
+    if (PHP_VERSION_ID >= 70300) {
+        @session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } else {
+        @session_set_cookie_params(0, '/');
+    }
     @session_start();
 }
 
-// 로그인 세션 활동 시간 갱신 (15분 idle = 자동 로그아웃)
-if (isset($_SESSION['learning_user']) && isset($_SESSION['last_activity'])) {
-    if (time() - $_SESSION['last_activity'] > 900) {
-        unset($_SESSION['learning_user']);
-        unset($_SESSION['last_activity']);
-    }
-}
+// 로그인 세션 비활동(Idle) 시간 검증 (마지막 활동 후 15분=900초 동안 아무 요청이 없으면 자동 로그아웃)
 if (isset($_SESSION['learning_user'])) {
-    $_SESSION['last_activity'] = time();
+    if (isset($_SESSION['last_activity'])) {
+        $idle_seconds = time() - (int)$_SESSION['last_activity'];
+        if ($idle_seconds > 900) {
+            // 15분 이상 비활동인 경우 세션 정리 (자동 로그아웃 및 잠금 게이트 활성화)
+            unset($_SESSION['learning_user']);
+            unset($_SESSION['last_activity']);
+            if (isset($_SESSION['admin'])) {
+                unset($_SESSION['admin']);
+            }
+            if (isset($_SESSION['site_unlocked'])) {
+                unset($_SESSION['site_unlocked']);
+            }
+        } else {
+            // 15분 이내에 새로고침 또는 요청이 발생하면 마지막 활동 시각 갱신
+            $_SESSION['last_activity'] = time();
+        }
+    } else {
+        $_SESSION['last_activity'] = time();
+    }
 }
 
 // .env 파일 로드 로직
@@ -166,9 +197,18 @@ function get_site_settings() {
     return array_merge($default_settings, $data);
 }
 
+function is_admin_user() {
+    if (isset($_SESSION['admin']) && $_SESSION['admin'] === true) return true;
+    if (isset($_SESSION['learning_user']) && is_array($_SESSION['learning_user'])) {
+        if (!empty($_SESSION['learning_user']['is_admin'])) return true;
+        if (isset($_SESSION['learning_user']['username']) && in_array($_SESSION['learning_user']['username'], ['이우성', 'admin'])) return true;
+    }
+    return false;
+}
+
 $site_settings = get_site_settings();
 $is_private_mode = (bool)$site_settings['is_private'];
-$is_admin_session = isset($_SESSION['admin']) && $_SESSION['admin'] === true;
+$is_admin_session = is_admin_user();
 $is_site_unlocked = $is_admin_session || (isset($_SESSION['site_unlocked']) && $_SESSION['site_unlocked'] === true);
 
 if (!file_exists($upload_dir)) @mkdir($upload_dir, 0777, true);
@@ -372,10 +412,10 @@ if ($action) {
     if ($action === 'status') {
         $vStats = get_visitor_stats();
         $site_settings = get_site_settings();
-        $is_admin = isset($_SESSION['admin']) && $_SESSION['admin'] === true;
+        $is_admin = is_admin_user();
         echo json_encode([
             'is_admin' => $is_admin,
-            'is_unlocked' => $is_admin,
+            'is_unlocked' => $is_admin || (isset($_SESSION['site_unlocked']) && $_SESSION['site_unlocked'] === true),
             'is_private' => (bool)$site_settings['is_private'],
             'today_visitors' => $vStats['today'],
             'total_visitors' => $vStats['total']
@@ -441,7 +481,7 @@ if ($action) {
     }
     
     if ($action === 'toggle_private') {
-        if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        if (!is_admin_user()) {
             http_response_code(403);
             echo json_encode(['error' => '권한이 없습니다.']);
             exit;
@@ -462,7 +502,167 @@ if ($action) {
 
     if ($action === 'logout') {
         unset($_SESSION['admin']);
-        // $_SESSION['site_unlocked']는 유지하여 게이트로 튕기지 않고 기본 화면 유지
+        unset($_SESSION['site_unlocked']);
+        unset($_SESSION['learning_user']);
+        unset($_SESSION['last_activity']);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    // --- 문제 오류 신고 및 격리 (Quarantine) 시스템 API ---
+    $reports_file = __DIR__ . '/data/problem_reports.json';
+
+    // 1. 문제 오류 신고 제출
+    if ($action === 'problem_report_submit') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input) $input = $_POST;
+
+        $excel_file = isset($input['excel_file']) ? trim($input['excel_file']) : '';
+        $quiz_type = isset($input['quiz_type']) ? trim($input['quiz_type']) : 'theory';
+        $p_grade = isset($input['grade']) ? trim($input['grade']) : $grade;
+        $problem_id = isset($input['problem_id']) ? trim($input['problem_id']) : '';
+        $problem_text = isset($input['problem_text']) ? trim($input['problem_text']) : '';
+        $reason_type = isset($input['reason_type']) ? trim($input['reason_type']) : '기타 오류';
+        $reason_detail = isset($input['reason_detail']) ? trim($input['reason_detail']) : '';
+        $reporter = isset($_SESSION['learning_user']) ? $_SESSION['learning_user'] : (isset($input['reporter']) ? trim($input['reporter']) : '익명 수험생');
+
+        if (!$excel_file || !$problem_id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => '엑셀 파일명과 문제 번호는 필수입니다.']);
+            exit;
+        }
+
+        $report_id = 'rep_' . time() . '_' . rand(100, 999);
+        $new_report = [
+            'id' => $report_id,
+            'excel_file' => $excel_file,
+            'quiz_type' => $quiz_type,
+            'grade' => $p_grade,
+            'problem_id' => $problem_id,
+            'problem_text' => mb_substr($problem_text, 0, 150, 'UTF-8'),
+            'reason_type' => $reason_type,
+            'reason_detail' => $reason_detail,
+            'reporter' => $reporter,
+            'status' => 'reported', // reported: 격리중, resolved: 수정완료(출제재개)
+            'created_at' => date('Y-m-d H:i:s'),
+            'resolved_at' => null
+        ];
+
+        atomic_json_modify($reports_file, function($data) use ($new_report) {
+            if (!is_array($data)) $data = [];
+            // 이미 동일 파일 + 동일 문제의 미해결 신고가 있는지 확인
+            $exists_idx = -1;
+            foreach ($data as $idx => $item) {
+                if ($item['excel_file'] === $new_report['excel_file'] && 
+                    (string)$item['problem_id'] === (string)$new_report['problem_id'] && 
+                    $item['status'] === 'reported') {
+                    $exists_idx = $idx;
+                    break;
+                }
+            }
+            if ($exists_idx >= 0) {
+                // 기존 신고에 내용 덧붙임
+                $data[$exists_idx]['reason_detail'] .= "\n[추가신고] " . $new_report['reason_detail'];
+                $data[$exists_idx]['updated_at'] = date('Y-m-d H:i:s');
+            } else {
+                array_unshift($data, $new_report);
+            }
+            return $data;
+        });
+
+        echo json_encode(['success' => true, 'message' => '오류 신고가 접수되었습니다. 관리자 검토 전까지 해당 문제는 랜덤 출제에서 제외(격리)됩니다.']);
+        exit;
+    }
+
+    // 2. 오류 신고 목록 조회 (격리 대상 ID 조회 포함)
+    if ($action === 'problem_reports_get') {
+        $for_quiz = isset($_GET['for_quiz']) && $_GET['for_quiz'] === 'true';
+        $target_excel = isset($_GET['excel_file']) ? trim($_GET['excel_file']) : '';
+        $reports = atomic_json_read($reports_file);
+        if (!is_array($reports)) $reports = [];
+
+        if ($for_quiz) {
+            // 퀴즈 엔진용: 현재 'reported' 상태인 문제 번호 목록만 빠르게 반환
+            $quarantine_ids = [];
+            foreach ($reports as $r) {
+                if ($r['status'] === 'reported') {
+                    if (!$target_excel || $r['excel_file'] === $target_excel || strpos($r['excel_file'], $target_excel) !== false) {
+                        $quarantine_ids[] = (string)$r['problem_id'];
+                    }
+                }
+            }
+            echo json_encode([
+                'success' => true,
+                'quarantine_ids' => array_values(array_unique($quarantine_ids))
+            ]);
+            exit;
+        }
+
+        // 관리자용 전체 목록
+        $pending_count = 0;
+        foreach ($reports as $r) {
+            if ($r['status'] === 'reported') $pending_count++;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'reports' => $reports,
+            'pending_count' => $pending_count
+        ]);
+        exit;
+    }
+
+    // 3. 관리자: 오류 수정 완료 (출제 재개)
+    if ($action === 'problem_report_resolve') {
+        if (!is_admin_user()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => '관리자 권한이 필요합니다.']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $report_id = isset($input['report_id']) ? trim($input['report_id']) : '';
+
+        if (!$report_id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => '신고 ID가 필요합니다.']);
+            exit;
+        }
+
+        atomic_json_modify($reports_file, function($data) use ($report_id) {
+            if (!is_array($data)) return [];
+            foreach ($data as &$item) {
+                if ($item['id'] === $report_id) {
+                    $item['status'] = 'resolved';
+                    $item['resolved_at'] = date('Y-m-d H:i:s');
+                    break;
+                }
+            }
+            return $data;
+        });
+
+        echo json_encode(['success' => true, 'message' => '수정 완료 처리되었습니다. 문제가 다시 정상 출제 풀에 복귀합니다.']);
+        exit;
+    }
+
+    // 4. 관리자: 오류 신고 삭제
+    if ($action === 'problem_report_delete') {
+        if (!is_admin_user()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => '관리자 권한이 필요합니다.']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $report_id = isset($input['report_id']) ? trim($input['report_id']) : '';
+
+        atomic_json_modify($reports_file, function($data) use ($report_id) {
+            if (!is_array($data)) return [];
+            return array_values(array_filter($data, function($item) use ($report_id) {
+                return $item['id'] !== $report_id;
+            }));
+        });
+
         echo json_encode(['success' => true]);
         exit;
     }
@@ -589,7 +789,7 @@ if ($action) {
     }
 
     if ($action === 'delete_video') {
-        if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        if (!is_admin_user()) {
             http_response_code(403);
             echo json_encode(['error' => '권한이 없습니다.']);
             exit;
@@ -680,7 +880,7 @@ if ($action) {
     }
     
     if ($action === 'upload_drawing') {
-        if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        if (!is_admin_user()) {
             http_response_code(403);
             exit(json_encode(['error' => '권한이 없습니다.']));
         }
@@ -709,7 +909,7 @@ if ($action) {
 
     
     if ($action === 'upload') {
-        if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        if (!is_admin_user()) {
             http_response_code(403);
             echo json_encode(['error' => '권한이 없습니다.']);
             exit;
@@ -797,7 +997,7 @@ if ($action) {
     }
 
     if ($action === 'delete') {
-        if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        if (!is_admin_user()) {
             http_response_code(403);
             echo json_encode(['error' => '권한이 없습니다.']);
             exit;
@@ -1284,7 +1484,7 @@ if ($action) {
     }
 
     if ($action === 'section_titles_update') {
-        if (!isset($_SESSION['admin']) || $_SESSION['admin'] !== true) {
+        if (!is_admin_user()) {
             http_response_code(403);
             exit(json_encode(['error' => '권한이 없습니다.']));
         }
@@ -1365,11 +1565,17 @@ if ($action) {
         $user_id = $pdo->lastInsertId();
 
         // 세션 로그인
+        $is_admin = ($role === 'admin' || $username === '이우성' || $username === 'admin');
         $_SESSION['learning_user'] = [
             'id' => $user_id,
             'username' => $username,
-            'is_admin' => ($role === 'admin')
+            'is_admin' => $is_admin
         ];
+        if ($is_admin) {
+            $_SESSION['admin'] = true;
+        }
+        $_SESSION['site_unlocked'] = true;
+        $_SESSION['last_activity'] = time();
 
         // 가입 완료 후 빈 학습 통계 레코드 생성 (선택 사항)
         $stmt = $pdo->prepare("INSERT IGNORE INTO learning_stats (user_id, grade, subject) VALUES (:uid, 'grade1', 'default'), (:uid2, 'grade2', 'default')");
@@ -1379,7 +1585,7 @@ if ($action) {
         echo json_encode([
             'success' => true,
             'message' => '회원가입이 완료되었습니다!',
-            'user' => ['id' => $user_id, 'username' => $username, 'is_admin' => ($role === 'admin')]
+            'user' => ['id' => $user_id, 'username' => $username, 'is_admin' => $is_admin]
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -1429,11 +1635,17 @@ if ($action) {
         }
 
         // 3. 세션 등록 및 로그인 시간/IP 기록
+        $is_admin = ($user['role'] === 'admin' || $user['username'] === '이우성' || $user['username'] === 'admin');
         $_SESSION['learning_user'] = [
             'id' => $user['id'],
             'username' => $user['username'],
-            'is_admin' => ($user['role'] === 'admin')
+            'is_admin' => $is_admin
         ];
+        if ($is_admin) {
+            $_SESSION['admin'] = true;
+        }
+        $_SESSION['site_unlocked'] = true;
+        $_SESSION['last_activity'] = time();
 
         if ($user['id'] !== 'admin') {
             $ip_address = $_SERVER['REMOTE_ADDR'];
@@ -1450,7 +1662,7 @@ if ($action) {
         echo json_encode([
             'success' => true,
             'message' => '로그인 성공!',
-            'user' => ['id' => $user['id'], 'username' => $user['username'], 'is_admin' => ($user['role'] === 'admin')]
+            'user' => ['id' => $user['id'], 'username' => $user['username'], 'is_admin' => $is_admin]
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -1458,6 +1670,9 @@ if ($action) {
     // 3) 학습자 로그아웃
     if ($action === 'learning_logout') {
         unset($_SESSION['learning_user']);
+        unset($_SESSION['admin']);
+        unset($_SESSION['site_unlocked']);
+        unset($_SESSION['last_activity']);
         echo json_encode(['success' => true, 'message' => '로그아웃되었습니다.']);
         exit;
     }

@@ -617,10 +617,26 @@ async function checkAndSaveHighScore(mode, currentStreak) {
     }
 }
 
-function applyJournalData(data) {
+async function filterQuarantinedIds(fileName, ids) {
+    if (!ids || ids.length === 0) return ids;
+    try {
+        const cleanFile = (fileName || '').replace(/^excels\//, '');
+        const res = await fetch('?action=problem_reports_get&for_quiz=true&excel_file=' + encodeURIComponent(cleanFile));
+        const json = await res.json();
+        if (json && json.success && Array.isArray(json.quarantine_ids) && json.quarantine_ids.length > 0) {
+            const quaranSet = new Set(json.quarantine_ids.map(String));
+            return ids.filter(id => !quaranSet.has(String(id)));
+        }
+    } catch(e) {
+        console.warn('격리 문제 필터링 조회 실패:', e);
+    }
+    return ids;
+}
+
+async function applyJournalData(data) {
     problemsMap.clear();
     answersMap.clear();
-    problemIds = data.problemIds || [];
+    let rawIds = data.problemIds || [];
     unusedProblemIds = [];
     
     if (data.problemsMapArr) {
@@ -633,6 +649,8 @@ function applyJournalData(data) {
         data.dynamicAccounts.forEach(acc => dynamicAccounts.add(acc));
     }
 
+    problemIds = await filterQuarantinedIds(currentLoadingJournalFile, rawIds);
+
     const statusMessage = document.getElementById('status-message');
     if (problemIds.length > 0) {
         if (statusMessage) statusMessage.innerHTML = '성공적으로 불러왔습니다! 총 <strong>' + problemIds.length + '</strong>문항 연동 완료.';
@@ -644,11 +662,11 @@ function applyJournalData(data) {
     }
 }
 
-function applyTheoryData(data) {
+async function applyTheoryData(data) {
     if (typeof theoryProblemsMap !== 'undefined') {
         theoryProblemsMap.clear();
         theoryAnswersMap.clear();
-        theoryProblemIds = data.theoryProblemIds || [];
+        let rawIds = data.theoryProblemIds || [];
         unusedTheoryIds = [];
         
         if (data.theoryProblemsMapArr) {
@@ -657,6 +675,8 @@ function applyTheoryData(data) {
         if (data.theoryAnswersMapArr) {
             data.theoryAnswersMapArr.forEach(arr => theoryAnswersMap.set(arr[0], arr[1]));
         }
+
+        theoryProblemIds = await filterQuarantinedIds(currentLoadingTheoryFile, rawIds);
 
         const statusMessage = document.getElementById('theory-status-message');
         if (theoryProblemIds.length > 0) {

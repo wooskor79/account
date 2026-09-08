@@ -11,7 +11,7 @@ $site_settings = get_site_settings();
 $is_private = (bool)$site_settings['is_private'];
 $is_learning_user = isset($_SESSION['learning_user']) && !empty($_SESSION['learning_user']);
 $is_admin = (isset($_SESSION['admin']) && $_SESSION['admin'] === true) || ($is_learning_user && !empty($_SESSION['learning_user']['is_admin']));
-$show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
+$show_lock_gate = !$is_admin && !$is_learning_user;
 ?>
 <!DOCTYPE html>
 <html lang="ko">
@@ -21,6 +21,26 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
     <title>전산회계 자료실</title>
     
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+    // [즉시 실행] 15분 이내 로그인된 유저인 경우 새로고침 시 site-lock-gate 잠금 모달이 0.001초도 뜨지 않도록 사전 차단
+    (function() {
+        try {
+            var localRaw = localStorage.getItem('learning_user_info');
+            var sessUser = sessionStorage.getItem('learning_username');
+            var isValid = false;
+            if (localRaw) {
+                var parsed = JSON.parse(localRaw);
+                if (parsed && parsed.username && (Date.now() - (parsed.last_active || 0) < 15 * 60 * 1000)) {
+                    isValid = true;
+                }
+            }
+            if (sessUser) isValid = true;
+            if (isValid) {
+                document.write('<style>#site-lock-gate { display: none !important; }</style>');
+            }
+        } catch(e) {}
+    })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
     window.onerror = function(msg, url, lineNo, columnNo, error) {
@@ -217,7 +237,8 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
 
     <!-- 첫 화면 통합 로그인/회원가입 게이트 (비공개 모드 및 공통 인증) -->
     <div id="site-lock-gate" class="<?php echo $show_lock_gate ? '' : 'hidden'; ?> fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md px-4 overflow-y-auto">
-        <div class="bg-white rounded-3xl shadow-2xl p-7 sm:p-9 max-w-sm sm:max-w-md w-full text-center border border-slate-100 transition-all transform scale-100 my-8">
+        <div class="relative bg-white rounded-3xl shadow-2xl p-7 sm:p-9 max-w-sm sm:max-w-md w-full text-center border border-slate-100 transition-all transform scale-100 my-8">
+            <button type="button" onclick="closeSiteLoginModal()" id="site-lock-close-btn" class="absolute right-5 top-5 text-slate-400 hover:text-slate-600 text-2xl font-bold p-1 leading-none transition <?php echo $show_lock_gate ? 'hidden' : ''; ?>" title="닫기">&times;</button>
             <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
                 🔐
             </div>
@@ -395,16 +416,15 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                                 <span class="title-text">전산회계 자료</span>
                                 <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('accounting')" title="섹션 제목 변경">✏️</button>
                             </div>
-                            <div class="view-controls">
-                                <button class="btn-view" data-view="view-1" onclick="changeView('accounting', 'view-1', this)">1</button>
-                                <button class="btn-view" data-view="view-2" onclick="changeView('accounting', 'view-2', this)">2</button>
-                                <button class="btn-view" data-view="view-3" onclick="changeView('accounting', 'view-3', this)">3</button>
-                                <button class="btn-view" data-view="view-icon" onclick="changeView('accounting', 'view-icon', this)">▦</button>
+                            <div class="flex items-center gap-1.5">
+                                <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('accounting')" title="전산회계 자료 올리기"><span>➕</span><span>올리기</span></button>
+                                <div class="view-controls">
+                                    <button class="btn-view" data-view="view-1" onclick="changeView('accounting', 'view-1', this)">1</button>
+                                    <button class="btn-view" data-view="view-2" onclick="changeView('accounting', 'view-2', this)">2</button>
+                                    <button class="btn-view" data-view="view-3" onclick="changeView('accounting', 'view-3', this)">3</button>
+                                    <button class="btn-view" data-view="view-icon" onclick="changeView('accounting', 'view-icon', this)">▦</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="upload-section" id="upload-accounting">
-                            <input type="file" id="file-accounting">
-                            <button class="upload-btn" onclick="uploadFile('accounting')">파일 올리기</button>
                         </div>
                         <ul class="file-list" id="list-accounting"></ul>
                     </section>
@@ -416,16 +436,15 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                                 <span class="title-text">일반 자료</span>
                                 <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('general')" title="섹션 제목 변경">✏️</button>
                             </div>
-                            <div class="view-controls">
-                                <button class="btn-view" data-view="view-1" onclick="changeView('general', 'view-1', this)">1</button>
-                                <button class="btn-view" data-view="view-2" onclick="changeView('general', 'view-2', this)">2</button>
-                                <button class="btn-view" data-view="view-3" onclick="changeView('general', 'view-3', this)">3</button>
-                                <button class="btn-view" data-view="view-icon" onclick="changeView('general', 'view-icon', this)">▦</button>
+                            <div class="flex items-center gap-1.5">
+                                <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('general')" title="일반 자료 올리기"><span>➕</span><span>올리기</span></button>
+                                <div class="view-controls">
+                                    <button class="btn-view" data-view="view-1" onclick="changeView('general', 'view-1', this)">1</button>
+                                    <button class="btn-view" data-view="view-2" onclick="changeView('general', 'view-2', this)">2</button>
+                                    <button class="btn-view" data-view="view-3" onclick="changeView('general', 'view-3', this)">3</button>
+                                    <button class="btn-view" data-view="view-icon" onclick="changeView('general', 'view-icon', this)">▦</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="upload-section" id="upload-general">
-                            <input type="file" id="file-general">
-                            <button class="upload-btn" onclick="uploadFile('general')">파일 올리기</button>
                         </div>
                         <ul class="file-list" id="list-general"></ul>
                     </section>
@@ -441,11 +460,14 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                             <span class="title-text">그림 자료</span>
                             <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('drawing')" title="섹션 제목 변경">✏️</button>
                         </div>
-                        <div class="view-controls">
-                            <button class="btn-view" data-view="view-1" onclick="changeView('drawing', 'view-1', this)">1</button>
-                            <button class="btn-view" data-view="view-2" onclick="changeView('drawing', 'view-2', this)">2</button>
-                            <button class="btn-view" data-view="view-3" onclick="changeView('drawing', 'view-3', this)">3</button>
-                            <button class="btn-view" data-view="view-icon" onclick="changeView('drawing', 'view-icon', this)">▦</button>
+                        <div class="flex items-center gap-1.5">
+                            <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('drawing')" title="그림 자료 올리기"><span>➕</span><span>올리기</span></button>
+                            <div class="view-controls">
+                                <button class="btn-view" data-view="view-1" onclick="changeView('drawing', 'view-1', this)">1</button>
+                                <button class="btn-view" data-view="view-2" onclick="changeView('drawing', 'view-2', this)">2</button>
+                                <button class="btn-view" data-view="view-3" onclick="changeView('drawing', 'view-3', this)">3</button>
+                                <button class="btn-view" data-view="view-icon" onclick="changeView('drawing', 'view-icon', this)">▦</button>
+                            </div>
                         </div>
                     </div>
                     
@@ -453,10 +475,6 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                         💡 이미지를 복사한 후 화면 아무 곳에서나 <b>Ctrl + V (붙여넣기)</b>를 누르면 그림이 업로드됩니다.
                     </div>
                     
-                    <div class="upload-section" id="upload-drawing">
-                        <input type="file" id="file-drawing" accept="image/*">
-                        <button class="upload-btn" onclick="uploadFile('drawing')">파일 올리기</button>
-                    </div>
                     <ul class="file-list" id="list-drawing"></ul>
                 </section>
             </div>
@@ -471,16 +489,15 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                             <span class="title-text">이서희선생님 자료</span>
                             <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('seohee')" title="섹션 제목 변경">✏️</button>
                         </div>
-                        <div class="view-controls">
-                            <button class="btn-view" data-view="view-1" onclick="changeView('seohee', 'view-1', this)">1</button>
-                            <button class="btn-view" data-view="view-2" onclick="changeView('seohee', 'view-2', this)">2</button>
-                            <button class="btn-view" data-view="view-3" onclick="changeView('seohee', 'view-3', this)">3</button>
-                            <button class="btn-view" data-view="view-icon" onclick="changeView('seohee', 'view-icon', this)">▦</button>
+                        <div class="flex items-center gap-1.5">
+                            <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('seohee')" title="이서희선생님 자료 올리기"><span>➕</span><span>올리기</span></button>
+                            <div class="view-controls">
+                                <button class="btn-view" data-view="view-1" onclick="changeView('seohee', 'view-1', this)">1</button>
+                                <button class="btn-view" data-view="view-2" onclick="changeView('seohee', 'view-2', this)">2</button>
+                                <button class="btn-view" data-view="view-3" onclick="changeView('seohee', 'view-3', this)">3</button>
+                                <button class="btn-view" data-view="view-icon" onclick="changeView('seohee', 'view-icon', this)">▦</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="upload-section" id="upload-seohee">
-                        <input type="file" id="file-seohee">
-                        <button class="upload-btn" onclick="uploadFile('seohee')">파일 올리기</button>
                     </div>
                     <ul class="file-list" id="list-seohee"></ul>
                 </section>
@@ -495,16 +512,15 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                             <span class="title-text">우승현선생님 자료 (희라쌤자료)</span>
                             <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('heera')" title="섹션 제목 변경">✏️</button>
                         </div>
-                        <div class="view-controls">
-                            <button class="btn-view" data-view="view-1" onclick="changeView('heera', 'view-1', this)">1</button>
-                            <button class="btn-view" data-view="view-2" onclick="changeView('heera', 'view-2', this)">2</button>
-                            <button class="btn-view" data-view="view-3" onclick="changeView('heera', 'view-3', this)">3</button>
-                            <button class="btn-view" data-view="view-icon" onclick="changeView('heera', 'view-icon', this)">▦</button>
+                        <div class="flex items-center gap-1.5">
+                            <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('heera')" title="우승현선생님 자료 올리기"><span>➕</span><span>올리기</span></button>
+                            <div class="view-controls">
+                                <button class="btn-view" data-view="view-1" onclick="changeView('heera', 'view-1', this)">1</button>
+                                <button class="btn-view" data-view="view-2" onclick="changeView('heera', 'view-2', this)">2</button>
+                                <button class="btn-view" data-view="view-3" onclick="changeView('heera', 'view-3', this)">3</button>
+                                <button class="btn-view" data-view="view-icon" onclick="changeView('heera', 'view-icon', this)">▦</button>
+                            </div>
                         </div>
-                    </div>
-                    <div class="upload-section" id="upload-heera">
-                        <input type="file" id="file-heera">
-                        <button class="upload-btn" onclick="uploadFile('heera')">파일 올리기</button>
                     </div>
                     <ul class="file-list" id="list-heera"></ul>
                 </section>
@@ -567,6 +583,9 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                         <span id="journal-difficulty-badge" class="hidden md:inline-block mobile-hidden bg-amber-100/80 text-amber-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">⚡ 난이도: -</span>
                         <span id="journal-accuracy-badge" class="hidden md:inline-block mobile-hidden bg-blue-100/80 text-blue-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🎯 정답률: -%</span>
                         <span id="journal-high-score-badge" class="hidden md:inline-block mobile-hidden bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🏆 최고기록: 불러오는 중...</span>
+                        <button type="button" onclick="openProblemReportModal('journal')" class="text-xs font-bold text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-2 py-0.5 rounded-md border border-slate-200 transition flex items-center gap-1 shadow-2xs" title="문제 오류 신고 시 관리자 검토 전까지 자동 격리됩니다">
+                            <span>🚨</span><span>오류신고</span>
+                        </button>
                     </div>
                     <div class="flex flex-col items-end gap-2 flex-shrink-0">
                         <button onclick="toggleCalculator()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-xl transition font-bold border border-indigo-200 shadow-sm whitespace-nowrap">🧮 계산기</button>
@@ -611,7 +630,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 <h2 id="result-title" class="text-xl font-bold text-slate-800 mb-1">정답입니다!</h2>
                 <p id="result-desc" class="text-sm text-slate-500 mb-6">훌륭합니다. 정확하게 분개하셨네요.</p>
 
-                <div class="bg-slate-50 rounded-2xl p-5 mb-6 text-left border border-slate-100 space-y-4">
+                <div class="bg-slate-50 rounded-2xl p-5 mb-4 text-left border border-slate-100 space-y-4">
                     <div id="user-answer-display-box" class="hidden border-b border-slate-200/60 pb-3">
                         <h4 class="text-xs font-bold text-rose-500 uppercase tracking-wide mb-1.5">❌ 내가 입력한 답안</h4>
                         <div id="user-answer-display" class="text-sm text-slate-700 pl-2 space-y-0.5"></div>
@@ -622,6 +641,12 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                         <div id="correct-answer-display" class="text-sm font-semibold text-slate-700 mb-3 space-y-1"></div>
                         <p id="explanation-text" class="text-sm text-slate-600 leading-relaxed border-t border-slate-200/60 pt-3"></p>
                     </div>
+                </div>
+
+                <div class="flex justify-end mb-4">
+                    <button type="button" onclick="openProblemReportModal('journal')" class="text-xs font-bold text-slate-400 hover:text-rose-600 transition flex items-center gap-1">
+                        <span>🚨 문제/정답 오류 신고</span>
+                    </button>
                 </div>
 
                 <div class="flex gap-3">
@@ -685,6 +710,9 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                         <span id="theory-difficulty-badge" class="hidden md:inline-block mobile-hidden bg-emerald-100/80 text-emerald-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">⚡ 난이도: -</span>
                         <span id="theory-accuracy-badge" class="hidden md:inline-block mobile-hidden bg-blue-100/80 text-blue-900 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🎯 정답률: -%</span>
                         <span id="theory-high-score-badge" class="hidden md:inline-block mobile-hidden bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md font-bold whitespace-nowrap">🏆 최고기록: 불러오는 중...</span>
+                        <button type="button" onclick="openProblemReportModal('theory')" class="text-xs font-bold text-slate-400 hover:text-rose-600 bg-slate-100 hover:bg-rose-50 px-2 py-0.5 rounded-md border border-slate-200 transition flex items-center gap-1 shadow-2xs" title="문제 오류 신고 시 관리자 검토 전까지 자동 격리됩니다">
+                            <span>🚨</span><span>오류신고</span>
+                        </button>
                     </div>
                     <div class="flex flex-col items-end gap-2 flex-shrink-0">
                         <button onclick="toggleCalculator()" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-xl transition font-bold border border-indigo-200 shadow-sm whitespace-nowrap">🧮 계산기</button>
@@ -713,7 +741,7 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 <h2 id="theory-result-title" class="text-xl font-bold text-slate-800 mb-1">정답입니다!</h2>
                 <p id="theory-result-desc" class="text-sm text-slate-500 mb-6">정확한 개념을 알고 계시네요!</p>
 
-                <div class="bg-slate-50 rounded-2xl p-5 mb-6 text-left border border-slate-100 space-y-3">
+                <div class="bg-slate-50 rounded-2xl p-5 mb-4 text-left border border-slate-100 space-y-3">
                     <div id="theory-user-answer-box" class="hidden border-b border-slate-200/60 pb-2">
                         <span class="text-xs font-bold text-rose-500 uppercase tracking-wide">❌ 내가 선택한 답:</span>
                         <div id="theory-user-answer-display" class="text-sm font-semibold text-rose-600 mt-1"></div>
@@ -724,6 +752,12 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                         <div id="theory-correct-answer-display" class="text-lg font-bold text-emerald-600 mb-2"></div>
                         <p id="theory-explanation-text" class="text-sm text-slate-600 leading-relaxed border-t border-slate-200/60 pt-3 whitespace-pre-wrap"></p>
                     </div>
+                </div>
+
+                <div class="flex justify-end mb-4">
+                    <button type="button" onclick="openProblemReportModal('theory')" class="text-xs font-bold text-slate-400 hover:text-rose-600 transition flex items-center gap-1">
+                        <span>🚨 문제/정답 오류 신고</span>
+                    </button>
                 </div>
 
                 <div class="flex gap-3">
@@ -1110,6 +1144,25 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
         </div>
     </div>
 
+    <!-- 15분 Idle 자동 로그아웃 1분 전 경고 커스텀 모달 (얼랏창 대체 모달) -->
+    <div id="idle-warning-modal" class="modal-overlay z-[999999]" style="display:none;">
+        <div class="max-w-md w-full mx-4 bg-slate-900 text-slate-100 rounded-3xl p-6 sm:p-7 shadow-2xl border border-amber-500/40 text-center relative overflow-hidden">
+            <div class="w-16 h-16 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
+                ⏳
+            </div>
+            <h3 class="text-lg font-black text-white">자동 로그아웃 안내</h3>
+            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+                14분 동안 비활동 상태가 유지되었습니다.<br>
+                <strong class="text-amber-400 font-extrabold" id="idle-countdown-seconds">60초 후</strong> 보안을 위해 자동으로 로그아웃됩니다.
+            </p>
+            <div class="mt-6 flex items-center justify-center gap-3">
+                <button onclick="extendUserSession()" class="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold rounded-xl text-xs shadow-lg transition transform active:scale-95">
+                    ⏰ 세션 15분 연장하기
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 통합 문서 & 그림 미리보기 모달 (PDF, XLSX, HWP/HWPX, IMAGE) -->
     <div id="doc-preview-modal" class="modal-overlay" style="display:none;" onclick="closePreviewModal(event)">
         <div class="doc-modal-content" id="doc-modal-content" onclick="event.stopPropagation()">
@@ -1279,10 +1332,19 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 
                 if(data.success) {
                     // 로그인 성공 시 사이트 잠금 해제 및 사용자 정보 저장
-                    document.getElementById('site-lock-gate').classList.add('hidden');
+                    const gate = document.getElementById('site-lock-gate');
+                    if (gate) {
+                        gate.classList.add('hidden');
+                        gate.style.display = 'none';
+                    }
                     window.currentUser = data.user;
+                    const isAdm = (data.user && (data.user.is_admin || data.user.username === '이우성' || data.user.username === 'admin'));
+                    if (typeof isAdmin !== 'undefined') {
+                        isAdmin = !!isAdm;
+                    }
                     window.sessionStorage.setItem('learning_username', username);
                     if(typeof syncUserName === 'function') syncUserName(username);
+                    if(typeof toggleUploadSections === 'function') toggleUploadSections();
                     if(typeof renderLoginSection === 'function') renderLoginSection();
                     await window.showAlert("로그인 성공! 환영합니다.");
                 } else {
@@ -1322,12 +1384,21 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
                 const data = await res.json();
                 
                 if(data.success) {
+                    const isAdm = (data.user && (data.user.is_admin || data.user.username === '이우성' || data.user.username === 'admin'));
+                    if (typeof isAdmin !== 'undefined') {
+                        isAdmin = !!isAdm;
+                    }
+                    window.currentUser = data.user;
                     window.sessionStorage.setItem('learning_username', username);
                     if(typeof syncUserName === 'function') syncUserName(username);
+                    if(typeof toggleUploadSections === 'function') toggleUploadSections();
                     if(typeof renderLoginSection === 'function') renderLoginSection();
                     await window.showAlert("회원가입 완료! 자동으로 로그인되었습니다.", "환영합니다");
                     const gate = document.getElementById('site-lock-gate');
-                    if (gate) gate.classList.add('hidden');
+                    if (gate) {
+                        gate.classList.add('hidden');
+                        gate.style.display = 'none';
+                    }
                 } else {
                     errEl.innerText = data.message;
                     errEl.classList.remove('hidden');
@@ -1351,18 +1422,113 @@ $show_lock_gate = $is_private && !$is_admin && !$is_learning_user;
         }
     };
 
-    // PHP 세션 쿠키 유실(나스 환경/시크릿 모드)에 대비한 강력한 2차 방어막 (SessionStorage 기반 게이트 해제)
+    // PHP 세션 쿠키 유실(나스 환경/시크릿 모드)에 대비한 강력한 2차 방어막 (SessionStorage/LocalStorage 기반 게이트 해제)
     document.addEventListener('DOMContentLoaded', () => {
         const storedUser = window.sessionStorage.getItem('learning_username');
-        if (storedUser) {
+        const localRaw = localStorage.getItem('learning_user_info');
+        let localUser = null;
+        if (localRaw) {
+            try {
+                const parsed = JSON.parse(localRaw);
+                if (parsed && parsed.username && (Date.now() - (parsed.last_active || 0) < 15 * 60 * 1000)) {
+                    localUser = parsed.username;
+                }
+            } catch(e) {}
+        }
+        const activeUser = storedUser || localUser;
+        if (activeUser) {
             const gate = document.getElementById('site-lock-gate');
             if (gate) {
                 gate.classList.add('hidden');
-                // 기존 이름 연동 함수가 있다면 호출
-                if(typeof syncUserName === 'function') syncUserName(storedUser);
+                gate.style.display = 'none';
+                if(typeof syncUserName === 'function') syncUserName(activeUser);
+            }
+            if (activeUser === '이우성' || activeUser === 'admin') {
+                if (typeof isAdmin !== 'undefined') isAdmin = true;
+                if (typeof toggleUploadSections === 'function') toggleUploadSections();
+                if (typeof renderLoginSection === 'function') renderLoginSection();
             }
         }
     });
     </script>
+
+    <!-- 문제 오류 신고 팝업 모달 -->
+    <div id="problem-report-modal" class="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-md w-full border border-slate-100 transition-all text-left">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🚨</span>
+                    <h3 class="text-lg font-bold text-slate-800">문제 오류 신고</h3>
+                </div>
+                <button type="button" onclick="closeProblemReportModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold p-1 leading-none">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs">
+                    <div class="text-slate-500 font-medium mb-1">신고 대상 문항:</div>
+                    <div id="report-target-info" class="font-bold text-slate-800 line-clamp-2"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2">오류 유형 선택</label>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-rose-50/50 cursor-pointer">
+                            <input type="radio" name="report-reason-type" value="보기/지문 오류" checked class="text-rose-600 focus:ring-rose-400">
+                            <span>보기/지문 이상</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-rose-50/50 cursor-pointer">
+                            <input type="radio" name="report-reason-type" value="정답 오류" class="text-rose-600 focus:ring-rose-400">
+                            <span>정답 번호 오류</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-rose-50/50 cursor-pointer">
+                            <input type="radio" name="report-reason-type" value="해설 오류" class="text-rose-600 focus:ring-rose-400">
+                            <span>해설 내용 이상</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-rose-50/50 cursor-pointer">
+                            <input type="radio" name="report-reason-type" value="대차차액/오타" class="text-rose-600 focus:ring-rose-400">
+                            <span>대차차액/오타</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">상세 내용 (선택)</label>
+                    <textarea id="report-reason-detail" rows="3" placeholder="어떤 부분이 잘못되었는지 간단히 적어주시면 빠른 수정에 큰 도움이 됩니다." class="w-full text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-400 resize-none"></textarea>
+                </div>
+                <p class="text-[11px] text-rose-500 font-medium">💡 신고된 문항은 관리자 검토 완료 전까지 다른 학생들에게 더 이상 랜덤 출제되지 않습니다.</p>
+                <div class="flex gap-2 pt-1">
+                    <button type="button" onclick="closeProblemReportModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs sm:text-sm font-bold rounded-xl transition">닫기</button>
+                    <button type="button" id="submit-problem-report-btn" onclick="submitProblemReport()" class="flex-1 py-3 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md transition flex items-center justify-center gap-1.5">
+                        <span>🚨</span><span>신고 제출하기</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 전용: 문제 오류 신고 관리 모달 -->
+    <div id="admin-problem-reports-modal" class="fixed inset-0 z-[999999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4 hidden">
+        <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-3xl w-full border border-slate-100 transition-all text-left flex flex-col max-h-[85vh]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🚨</span>
+                    <h3 class="text-lg font-bold text-slate-800">문제 오류 신고 관리 대시보드</h3>
+                    <span id="admin-reports-badge-status" class="text-xs bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full"></span>
+                </div>
+                <button type="button" onclick="closeAdminProblemReportsModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold p-1 leading-none">&times;</button>
+            </div>
+            <div class="flex items-center justify-between gap-2 mb-3 flex-shrink-0 text-xs">
+                <div class="flex gap-1.5 font-bold">
+                    <button onclick="filterAdminReports('all')" id="btn-rep-filter-all" class="px-3 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">전체</button>
+                    <button onclick="filterAdminReports('reported')" id="btn-rep-filter-reported" class="px-3 py-1 rounded-lg bg-rose-500 text-white transition">미해결 (격리중)</button>
+                    <button onclick="filterAdminReports('resolved')" id="btn-rep-filter-resolved" class="px-3 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition">수정 완료</button>
+                </div>
+                <button onclick="loadAdminProblemReports()" class="text-xs text-indigo-600 hover:underline font-bold flex items-center gap-1">🔄 새로고침</button>
+            </div>
+            <div class="flex-1 overflow-y-auto border border-slate-100 rounded-2xl">
+                <div id="admin-reports-table-container" class="divide-y divide-slate-100"></div>
+            </div>
+            <div class="pt-4 flex justify-end flex-shrink-0">
+                <button type="button" onclick="closeAdminProblemReportsModal()" class="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold rounded-xl transition">닫기</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

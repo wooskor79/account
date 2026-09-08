@@ -6,6 +6,7 @@ window.LearningEngine = (function() {
     let currentStepIdx = 0;
     let currentExtraQuiz = null; // 더풀기용 추가 문제를 보관할 객체
     let loadingExcelFiles = {}; // 엑셀 파일 로딩 중복 방지를 위한 상태 맵
+    let currentViewMode = 'default'; // 'default', 'admin', 'student' 모드 관리
 
     function getSectionTargets(sId) {
         if (sId === 'sec_cost' || sId === 'sec_vat') {
@@ -85,28 +86,128 @@ window.LearningEngine = (function() {
         if (!rawText) return '';
         let text = String(rawText).trim();
 
-        // 지문 뒤에 표 헤더나 자료 목록이 붙은 경우 분리
+        // 1. 마크다운 테이블 감지 (| 헤더1 | 헤더2 | ...)
+        const mdTableRegex = /((?:\|[^\n]+\|\r?\n?){2,})/;
+        const mdMatch = text.match(mdTableRegex);
+        if (mdMatch) {
+            const preText = text.substring(0, mdMatch.index).trim();
+            const tableText = mdMatch[1].trim();
+            const postText = text.substring(mdMatch.index + mdMatch[0].length).trim();
+
+            const lines = tableText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            const rows = lines.map(line => {
+                return line.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+            }).filter(r => !r.every(c => /^[-:\s]+$/.test(c))); // 구분선(---) 제외
+
+            if (rows.length >= 2) {
+                const headerRow = rows[0];
+                const bodyRows = rows.slice(1);
+                const tableHtml = `
+                    <div class="theory-table-container my-3">
+                        <table class="theory-table">
+                            <thead>
+                                <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
+                            </thead>
+                            <tbody>
+                                ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                let res = '';
+                if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
+                res += tableHtml;
+                if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
+                return res;
+            }
+        }
+
+        // 2. 질문 본문과 부가 데이터(표, 보기 박스 등) 분리
         const splitMatch = text.match(/^(.*?(\?|\.|\:))\s*(\n+|(?<=\?)\s+)(.+)$/s);
-        if (splitMatch && splitMatch[4] && splitMatch[4].trim().length > 5) {
+        if (splitMatch && splitMatch[4] && splitMatch[4].trim().length > 3) {
             const qMain = splitMatch[1].trim();
             const subData = splitMatch[4].trim();
+            const lines = subData.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-            const subCols = subData.split(/\s{2,}|\t|\n|(?<=잔액)\s+|(?<=\%)\s+|(?<=\))\s+/).map(s => s.trim()).filter(Boolean);
+            // 2-A. 특수 3열 원가 자료 표 자동 복원 (120회 9번 등)
+            if (lines.length >= 7 && lines[0].includes('기초') && lines[1].includes('기말') && (lines[2].includes('소비액') || lines[2].includes('기중'))) {
+                const headers = [lines[0], lines[1], lines[2]];
+                const dataItems = lines.slice(3);
+                if (dataItems.length === 9) {
+                    const rowCount = 3;
+                    const bodyRows = [];
+                    for (let r = 0; r < rowCount; r++) {
+                        bodyRows.push([dataItems[r], dataItems[r + 3], dataItems[r + 6]]);
+                    }
+                    return `
+                        <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
+                            ${escapeHtml(qMain).replace(/\n/g, '<br>')}
+                        </div>
+                        <div class="theory-table-container my-3">
+                            <table class="theory-table">
+                                <thead>
+                                    <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+                                </thead>
+                                <tbody>
+                                    ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+            }
 
-            if (subCols.length >= 2) {
+            // 2-B. 탭(\t) 구분 2차원 표 감지
+            const hasTabs = lines.some(l => l.includes('\t'));
+            if (hasTabs) {
+                const tableRows = lines.map(l => l.split('\t').map(c => c.trim()).filter(Boolean));
+                if (tableRows.length >= 2 && tableRows[0].length >= 2) {
+                    const headerRow = tableRows[0];
+                    const bodyRows = tableRows.slice(1);
+                    return `
+                        <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
+                            ${escapeHtml(qMain).replace(/\n/g, '<br>')}
+                        </div>
+                        <div class="theory-table-container my-3">
+                            <table class="theory-table">
+                                <thead>
+                                    <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
+                                </thead>
+                                <tbody>
+                                    ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                }
+            }
+
+            // 2-C. 공통 <보기> 또는 조건 박스 (가. 나. 다. / ㄱ. ㄴ. ㄷ. / ㆍ 조건 등)
+            const isBogiLike = lines.some(l => /^(가|나|다|라|마|바|ㄱ|ㄴ|ㄷ|ㄹ|ㅁ|ㅂ|a|b|c|d|A|B|C|D)\.|\<보기\>|\[보기\]|【보기】|^ㆍ|^·|^\-/.test(l));
+            if (isBogiLike || lines.length >= 2) {
+                let boxTitle = '보 기';
+                if (lines[0].includes('보기')) {
+                    boxTitle = lines[0].replace(/[<>[\]【】]/g, '').trim() || '보 기';
+                } else if (subData.includes('취득') || subData.includes('상각') || subData.includes('원가') || subData.includes('재고')) {
+                    boxTitle = '문제 자료';
+                }
+
+                const cleanLines = lines.filter(l => !/^[<>[\]【】\s]*보기[<>[\]【】\s]*$/i.test(l));
+                const isShortItems = cleanLines.every(l => l.length <= 25);
+                const gridClass = isShortItems && cleanLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5' : 'space-y-1.5';
+
                 return `
                     <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
                         ${escapeHtml(qMain).replace(/\n/g, '<br>')}
                     </div>
-                    <div class="theory-question-data-box p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                        <div class="flex items-center gap-1.5 font-extrabold text-slate-700 border-b border-slate-200/80 pb-1.5 mb-2">
+                    <div class="theory-bogi-box my-3">
+                        <div class="theory-bogi-header">
                             <span class="text-indigo-600">📋</span>
-                            <span>보기 표 헤더 / 문제 자료</span>
+                            <span>&lt;${escapeHtml(boxTitle)}&gt;</span>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 font-bold text-slate-700">
-                            ${subCols.map((col, cIdx) => `
-                                <span class="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-slate-800">${escapeHtml(col)}</span>
-                                ${cIdx < subCols.length - 1 ? '<span class="text-slate-300 font-bold">|</span>' : ''}
+                        <div class="theory-bogi-content ${gridClass}">
+                            ${cleanLines.map(line => `
+                                <div class="font-medium text-slate-700">${escapeHtml(line)}</div>
                             `).join('')}
                         </div>
                     </div>
@@ -243,6 +344,7 @@ window.LearningEngine = (function() {
 
         try {
             await window.LearningAuth.login(username, password);
+            if (typeof window.renderLoginSection === 'function') window.renderLoginSection();
             renderDashboard();
         } catch (err) {
             if (errMsg) {
@@ -290,8 +392,12 @@ window.LearningEngine = (function() {
     async function confirmLogout() {
         const modal = document.getElementById('learning-logout-modal');
         if (modal) modal.style.display = 'none';
-        await window.LearningAuth.logout();
-        renderAuthView('login');
+        if (typeof window.globalLogout === 'function') {
+            await window.globalLogout();
+        } else {
+            await window.LearningAuth.logout();
+            renderAuthView('login');
+        }
     }
 
     function resumeLastLearning() {
@@ -381,6 +487,9 @@ window.LearningEngine = (function() {
                         </div>
 
                         <div class="flex items-center gap-2.5">
+                            <button onclick="LearningEngine.switchDashboardViewMode('student')" class="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border border-blue-400/40 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-md transform active:scale-95">
+                                <span>📖</span> <span>나도 학습하기 (학습자 모드)</span>
+                            </button>
                             <button onclick="LearningEngine.renderAdminDashboard()" class="px-3.5 py-2 bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-700/50 text-indigo-100 font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm">
                                 <span>🔄</span> <span>새로고침</span>
                             </button>
@@ -592,12 +701,19 @@ window.LearningEngine = (function() {
     }
 
     // --- 2. 학습자 대시보드 화면 ---
-    function renderDashboard() {
+    function renderDashboard(forceMode = null) {
+        if (forceMode) {
+            currentViewMode = forceMode;
+        }
         const container = document.getElementById('learning-content-container');
         if (!container) return;
 
         const user = window.LearningAuth.getUser();
-        if (user && user.is_admin) {
+        if (!user) {
+            renderAuthView();
+            return;
+        }
+        if (user.is_admin && currentViewMode === 'admin') {
             renderAdminDashboard();
             return;
         }
@@ -652,9 +768,15 @@ window.LearningEngine = (function() {
                                     <h2 class="text-xl font-extrabold text-slate-800">
                                         ${escapeHtml(user ? user.username : '학습자')}님의 학습 공간
                                     </h2>
-                                    <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
-                                        전산회계 1급
-                                    </span>
+                                    ${user && user.is_admin ? `
+                                        <button onclick="LearningEngine.switchDashboardViewMode('admin')" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 text-xs font-extrabold rounded-lg border border-amber-300 transition flex items-center gap-1 shadow-2xs" title="관리자 전용 통계 모드로 돌아갑니다">
+                                            👑 관리자 센터로 이동
+                                        </button>
+                                    ` : `
+                                        <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
+                                            전산회계 1급
+                                        </span>
+                                    `}
                                     <button class="btn-resume-last-learning" onclick="LearningEngine.resumeLastLearning()" title="마지막으로 공부하던 위치로 즉시 이동합니다">
                                         <span class="pulse-dot"></span>
                                         <span>🚀 마지막 학습한 곳으로 이동</span>
@@ -673,7 +795,7 @@ window.LearningEngine = (function() {
                                 <span>오답노트</span>
                                 <span class="badge-wrong-pill ${wrongCount > 0 ? 'active' : ''}">${wrongCount}</span>
                             </button>
-                            <button class="btn-learning-logout-text" onclick="LearningEngine.showLogoutModal()" title="학습 종료 및 로그아웃">
+                            <button class="btn-learning-logout-text" onclick="window.globalLogout ? window.globalLogout() : LearningEngine.showLogoutModal()" title="학습 종료 및 로그아웃">
                                 <span>🚪</span>
                                 <span>로그아웃</span>
                             </button>
@@ -2507,6 +2629,11 @@ window.LearningEngine = (function() {
         }, 20);
     }
 
+    function switchDashboardViewMode(mode) {
+        currentViewMode = mode;
+        renderDashboard();
+    }
+
     return {
         initLearningApp,
         renderAuthView,
@@ -2518,6 +2645,7 @@ window.LearningEngine = (function() {
         confirmLogout,
         resumeLastLearning,
         renderDashboard,
+        switchDashboardViewMode,
         openSection,
         selectOption,
         submitTheoryQuiz,

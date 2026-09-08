@@ -57,28 +57,128 @@ function formatTheoryQuestionHtml(rawText) {
     if (!rawText) return '';
     let text = String(rawText).trim();
 
-    // 지문 뒤에 표 헤더나 자료 목록이 붙은 경우 분리
+    // 1. 마크다운 테이블 감지 (| 헤더1 | 헤더2 | ...)
+    const mdTableRegex = /((?:\|[^\n]+\|\r?\n?){2,})/;
+    const mdMatch = text.match(mdTableRegex);
+    if (mdMatch) {
+        const preText = text.substring(0, mdMatch.index).trim();
+        const tableText = mdMatch[1].trim();
+        const postText = text.substring(mdMatch.index + mdMatch[0].length).trim();
+
+        const lines = tableText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const rows = lines.map(line => {
+            return line.replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+        }).filter(r => !r.every(c => /^[-:\s]+$/.test(c))); // 구분선(---) 제외
+
+        if (rows.length >= 2) {
+            const headerRow = rows[0];
+            const bodyRows = rows.slice(1);
+            const tableHtml = `
+                <div class="theory-table-container my-3">
+                    <table class="theory-table">
+                        <thead>
+                            <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
+                        </thead>
+                        <tbody>
+                            ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            let res = '';
+            if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
+            res += tableHtml;
+            if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
+            return res;
+        }
+    }
+
+    // 2. 질문 본문과 부가 데이터(표, 보기 박스 등) 분리
     const splitMatch = text.match(/^(.*?(\?|\.|\:))\s*(\n+|(?<=\?)\s+)(.+)$/s);
-    if (splitMatch && splitMatch[4] && splitMatch[4].trim().length > 5) {
+    if (splitMatch && splitMatch[4] && splitMatch[4].trim().length > 3) {
         const qMain = splitMatch[1].trim();
         const subData = splitMatch[4].trim();
+        const lines = subData.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
 
-        const subCols = subData.split(/\s{2,}|\t|\n|(?<=잔액)\s+|(?<=\%)\s+|(?<=\))\s+/).map(s => s.trim()).filter(Boolean);
+        // 2-A. 특수 3열 원가 자료 표 자동 복원 (120회 9번 등)
+        if (lines.length >= 7 && lines[0].includes('기초') && lines[1].includes('기말') && (lines[2].includes('소비액') || lines[2].includes('기중'))) {
+            const headers = [lines[0], lines[1], lines[2]];
+            const dataItems = lines.slice(3);
+            if (dataItems.length === 9) {
+                const rowCount = 3;
+                const bodyRows = [];
+                for (let r = 0; r < rowCount; r++) {
+                    bodyRows.push([dataItems[r], dataItems[r + 3], dataItems[r + 6]]);
+                }
+                return `
+                    <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
+                        ${escapeHtml(qMain).replace(/\n/g, '<br>')}
+                    </div>
+                    <div class="theory-table-container my-3">
+                        <table class="theory-table">
+                            <thead>
+                                <tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+                            </thead>
+                            <tbody>
+                                ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        }
 
-        if (subCols.length >= 2) {
+        // 2-B. 탭(\t) 구분 2차원 표 감지
+        const hasTabs = lines.some(l => l.includes('\t'));
+        if (hasTabs) {
+            const tableRows = lines.map(l => l.split('\t').map(c => c.trim()).filter(Boolean));
+            if (tableRows.length >= 2 && tableRows[0].length >= 2) {
+                const headerRow = tableRows[0];
+                const bodyRows = tableRows.slice(1);
+                return `
+                    <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
+                        ${escapeHtml(qMain).replace(/\n/g, '<br>')}
+                    </div>
+                    <div class="theory-table-container my-3">
+                        <table class="theory-table">
+                            <thead>
+                                <tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>
+                            </thead>
+                            <tbody>
+                                ${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        }
+
+        // 2-C. 공통 <보기> 또는 조건 박스 (가. 나. 다. / ㄱ. ㄴ. ㄷ. / ㆍ 조건 등)
+        const isBogiLike = lines.some(l => /^(가|나|다|라|마|바|ㄱ|ㄴ|ㄷ|ㄹ|ㅁ|ㅂ|a|b|c|d|A|B|C|D)\.|\<보기\>|\[보기\]|【보기】|^ㆍ|^·|^\-/.test(l));
+        if (isBogiLike || lines.length >= 2) {
+            let boxTitle = '보 기';
+            if (lines[0].includes('보기')) {
+                boxTitle = lines[0].replace(/[<>[\]【】]/g, '').trim() || '보 기';
+            } else if (subData.includes('취득') || subData.includes('상각') || subData.includes('원가') || subData.includes('재고')) {
+                boxTitle = '문제 자료';
+            }
+
+            const cleanLines = lines.filter(l => !/^[<>[\]【】\s]*보기[<>[\]【】\s]*$/i.test(l));
+            const isShortItems = cleanLines.every(l => l.length <= 25);
+            const gridClass = isShortItems && cleanLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5' : 'space-y-1.5';
+
             return `
                 <div class="theory-question-main mb-2.5 font-bold text-slate-800 leading-relaxed">
                     ${escapeHtml(qMain).replace(/\n/g, '<br>')}
                 </div>
-                <div class="theory-question-data-box p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
-                    <div class="flex items-center gap-1.5 font-extrabold text-slate-700 border-b border-slate-200/80 pb-1.5 mb-2">
-                        <span class="text-emerald-600">📋</span>
-                        <span>보기 표 헤더 / 문제 자료</span>
+                <div class="theory-bogi-box my-3">
+                    <div class="theory-bogi-header">
+                        <span class="text-indigo-600">📋</span>
+                        <span>&lt;${escapeHtml(boxTitle)}&gt;</span>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 font-bold text-slate-700">
-                        ${subCols.map((col, cIdx) => `
-                            <span class="bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs text-slate-800">${escapeHtml(col)}</span>
-                            ${cIdx < subCols.length - 1 ? '<span class="text-slate-300 font-bold">|</span>' : ''}
+                    <div class="theory-bogi-content ${gridClass}">
+                        ${cleanLines.map(line => `
+                            <div class="font-medium text-slate-700">${escapeHtml(line)}</div>
                         `).join('')}
                     </div>
                 </div>

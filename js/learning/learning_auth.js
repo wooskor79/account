@@ -5,23 +5,83 @@ window.LearningAuth = (function() {
     let currentUser = null;
     let currentProgress = null;
 
-    async function checkStatus() {
+    function getLocalUser() {
         try {
-            const res = await fetch('?action=learning_status');
-            const data = await res.json();
-            if (data.is_logged_in && data.user) {
-                currentUser = data.user;
-                currentProgress = data.progress || {};
-                return { loggedIn: true, user: currentUser, progress: currentProgress };
-            } else {
-                currentUser = null;
-                currentProgress = null;
-                return { loggedIn: false };
+            const raw = localStorage.getItem('learning_user_info');
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data || !data.username) return null;
+
+            // 15분 idle (900,000ms) 지났는지 검증
+            const lastActive = data.last_active || 0;
+            if (Date.now() - lastActive > 15 * 60 * 1000) {
+                localStorage.removeItem('learning_user_info');
+                sessionStorage.removeItem('learning_username');
+                return null;
+            }
+            return data;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    function saveLocalUser(userObj) {
+        try {
+            const payload = {
+                id: userObj.id || userObj.username,
+                username: userObj.username,
+                is_admin: !!userObj.is_admin || (userObj.username === '이우성' || userObj.username === 'admin'),
+                last_active: Date.now()
+            };
+            localStorage.setItem('learning_user_info', JSON.stringify(payload));
+            sessionStorage.setItem('learning_username', userObj.username);
+        } catch(e) {}
+    }
+
+    function updateLocalActivity() {
+        try {
+            const raw = localStorage.getItem('learning_user_info');
+            if (raw) {
+                const data = JSON.parse(raw);
+                data.last_active = Date.now();
+                localStorage.setItem('learning_user_info', JSON.stringify(data));
+            }
+        } catch(e) {}
+    }
+
+    async function checkStatus() {
+        updateLocalActivity();
+        const localUser = getLocalUser();
+
+        try {
+            const res = await fetch('api.php?action=learning_status');
+            if (res.ok) {
+                const data = await res.json();
+                if (data.is_logged_in && data.user) {
+                    currentUser = data.user;
+                    currentProgress = data.progress || {};
+                    saveLocalUser(currentUser);
+                    return { loggedIn: true, user: currentUser, progress: currentProgress };
+                }
             }
         } catch (e) {
-            console.error('학습자 상태 확인 실패:', e);
-            return { loggedIn: false };
+            console.warn('서버 세션 확인 지연:', e);
         }
+
+        // 서버 세션 쿠키 전달이 일시 지연되더라도 15분 유효 로컬 세션으로 100% 로그인 유지
+        if (localUser) {
+            currentUser = {
+                id: localUser.id,
+                username: localUser.username,
+                is_admin: localUser.is_admin || (localUser.username === '이우성' || localUser.username === 'admin')
+            };
+            currentProgress = currentProgress || { completed_steps: [], section_progress: {}, wrong_notes: [], stats: { solved_count: 0, correct_count: 0 } };
+            return { loggedIn: true, user: currentUser, progress: currentProgress };
+        }
+
+        currentUser = null;
+        currentProgress = null;
+        return { loggedIn: false };
     }
 
     async function register(username, password, passwordConfirm) {
@@ -35,7 +95,7 @@ window.LearningAuth = (function() {
             throw new Error('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
         }
 
-        const res = await fetch('?action=learning_register', {
+        const res = await fetch('api.php?action=learning_register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -50,6 +110,7 @@ window.LearningAuth = (function() {
         }
 
         currentUser = data.user;
+        saveLocalUser(currentUser);
         currentProgress = {
             completed_steps: [],
             section_progress: {},
@@ -64,7 +125,7 @@ window.LearningAuth = (function() {
             throw new Error('이름과 비밀번호를 입력해주세요.');
         }
 
-        const res = await fetch('?action=learning_login', {
+        const res = await fetch('api.php?action=learning_login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -78,6 +139,7 @@ window.LearningAuth = (function() {
         }
 
         currentUser = data.user;
+        saveLocalUser(currentUser);
         await checkStatus();
         return data;
     }
@@ -88,11 +150,22 @@ window.LearningAuth = (function() {
         } catch (e) {}
         currentUser = null;
         currentProgress = null;
-        window.sessionStorage.removeItem('learning_username');
+        localStorage.removeItem('learning_user_info');
+        sessionStorage.removeItem('learning_username');
         location.reload();
     }
 
     function getUser() {
+        if (!currentUser) {
+            const localUser = getLocalUser();
+            if (localUser) {
+                currentUser = {
+                    id: localUser.id,
+                    username: localUser.username,
+                    is_admin: localUser.is_admin || (localUser.username === '이우성' || localUser.username === 'admin')
+                };
+            }
+        }
         return currentUser;
     }
 
@@ -111,6 +184,7 @@ window.LearningAuth = (function() {
         logout,
         getUser,
         getProgress,
-        setProgress
+        setProgress,
+        updateLocalActivity
     };
 })();

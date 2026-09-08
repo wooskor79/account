@@ -305,6 +305,9 @@ async function init() {
     await checkLoginStatus();
     // 페이지 로드/새로고침 시 PHP 세션에서 로그인 상태 복원
     await restoreSessionFromServer();
+    if (localStorage.getItem('active_view') === 'learning') {
+        openLearningCourseApp();
+    }
     await fetchSectionTitles();
     await fetchFiles();
     // 15분 idle 자동 로그아웃 타이머 시작
@@ -312,6 +315,7 @@ async function init() {
     initResizer('resizer1', 'col1-sub-grid', 'card-drawing', 'col1-wrapper');
     initResizer('resizer2', 'card-seohee', 'card-heera', 'col2-wrapper');
     initModalDrag();
+    setupCardDragAndDrop();
     
     if (typeof fetchExcelFile === 'function') fetchExcelFile('2급_분개문제(AI).xlsx');
     if (typeof fetchTheoryExcelFile === 'function') fetchTheoryExcelFile('2급_필기문제(AI).xlsx');
@@ -326,21 +330,111 @@ async function init() {
 
 }
 
+function setupCardDragAndDrop() {
+    const categories = ['accounting', 'general', 'drawing', 'seohee', 'heera'];
+    categories.forEach(cat => {
+        const card = document.getElementById(`card-${cat}`);
+        if (!card) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            card.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                card.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            card.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                card.classList.remove('drag-over');
+            }, false);
+        });
+
+        card.addEventListener('drop', async (e) => {
+            const dt = e.dataTransfer;
+            const files = dt ? dt.files : null;
+            if (files && files.length > 0) {
+                await uploadDroppedFiles(Array.from(files), cat);
+            }
+        }, false);
+    });
+}
+
+async function uploadDroppedFiles(files, category) {
+    if (!isAdmin && !isCurrentAdminCheck()) {
+        alert('자료 업로드는 관리자 권한이 필요합니다.');
+        return;
+    }
+    
+    if (typeof window.showAlert === 'function') {
+        window.showAlert(`총 ${files.length}개 파일 업로드를 시작합니다...`, '업로드 시작');
+    }
+    
+    try {
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const chunkSize = 5 * 1024 * 1024;
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+                
+                const formData = new FormData();
+                formData.append('file', chunk);
+                formData.append('filename', file.name);
+                formData.append('category', category);
+                formData.append('grade', currentGrade);
+                formData.append('chunk_index', chunkIndex);
+                formData.append('total_chunks', totalChunks);
+                
+                const res = await fetch('?action=upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) throw new Error(`${file.name} 업로드 실패 (HTTP ${res.status})`);
+            }
+        }
+        await fetchFiles();
+        if (typeof window.showAlert === 'function') {
+            window.showAlert(`🎉 파일이 성공적으로 업로드되었습니다! (${files.length}건)`, '업로드 성공');
+        } else {
+            alert(`🎉 파일 업로드 완료 (${files.length}건)`);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('업로드 오류: ' + err.message);
+    }
+}
+
 async function checkLoginStatus() {
     try {
         const res = await fetch('?action=status');
         const data = await res.json();
-        isAdmin = !!data.is_admin;
+        if (data.is_admin) isAdmin = true;
         isSiteUnlocked = !!data.is_unlocked;
         isPrivateMode = !!data.is_private;
 
         // 사이트 잠금 게이트 화면 동기화
         const lockGate = document.getElementById('site-lock-gate');
+        const hasLocalUser = isCurrentAdminCheck() || !!window.sessionStorage.getItem('learning_username');
+        
         if (lockGate) {
-            if (isPrivateMode && !isSiteUnlocked) {
+            if (!hasLocalUser) {
+                // 비로그인 상태는 무조건 로그인 게이트 표시
                 lockGate.classList.remove('hidden');
+                lockGate.style.display = 'flex';
+                const closeBtn = document.getElementById('site-lock-close-btn');
+                if (closeBtn) closeBtn.classList.add('hidden');
+                if (window.AuthEngine && typeof window.AuthEngine.switchTab === 'function') {
+                    window.AuthEngine.switchTab('login');
+                }
             } else {
                 lockGate.classList.add('hidden');
+                lockGate.style.display = 'none';
             }
         }
 
@@ -414,44 +508,283 @@ async function unlockSite(e) {
     }
 }
 
+function isCurrentAdminCheck() {
+    if (isAdmin) return true;
+    if (window.currentUser && (window.currentUser.is_admin || window.currentUser.username === '이우성' || window.currentUser.username === 'admin')) return true;
+    const sessUser = window.sessionStorage.getItem('learning_username');
+    if (sessUser === '이우성' || sessUser === 'admin') return true;
+    try {
+        const raw = localStorage.getItem('learning_user_info');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.is_admin || parsed.username === '이우성' || parsed.username === 'admin')) return true;
+        }
+    } catch(e) {}
+    return false;
+}
+
+function openSiteLoginModal(tab = 'login') {
+    const gate = document.getElementById('site-lock-gate');
+    if (gate) {
+        gate.classList.remove('hidden');
+        gate.style.display = 'flex';
+        const closeBtn = document.getElementById('site-lock-close-btn');
+        if (closeBtn) closeBtn.classList.remove('hidden');
+    }
+    if (window.AuthEngine && typeof window.AuthEngine.switchTab === 'function') {
+        window.AuthEngine.switchTab(tab);
+    }
+}
+
+function closeSiteLoginModal() {
+    const gate = document.getElementById('site-lock-gate');
+    if (gate) {
+        gate.classList.add('hidden');
+        gate.style.display = 'none';
+    }
+}
+
+function createAdminUploadModalElement() {
+    if (document.getElementById('admin-upload-modal')) return;
+    const div = document.createElement('div');
+    div.id = 'admin-upload-modal';
+    div.className = 'fixed inset-0 z-[999999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs px-4 hidden';
+    div.innerHTML = `
+        <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-md w-full border border-slate-100 transition-all">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">📁</span>
+                    <h3 class="text-lg font-bold text-slate-800">관리자 자료 올리기</h3>
+                </div>
+                <button type="button" onclick="closeAdminUploadModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold p-1 leading-none">&times;</button>
+            </div>
+            <div class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">올릴 카테고리 선택</label>
+                    <select id="admin-upload-category" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-700 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm">
+                        <option value="accounting">📘 전산회계 자료</option>
+                        <option value="general">📁 일반 자료</option>
+                        <option value="drawing">🎨 그림 자료</option>
+                        <option value="seohee">👩‍🏫 이서희선생님 자료</option>
+                        <option value="heera">👨‍🏫 우승현선생님 자료 (희라쌤)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">업로드할 파일 선택 (다중 선택 가능)</label>
+                    <input type="file" id="admin-upload-files" multiple class="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer border border-dashed border-slate-300 rounded-xl p-3 bg-slate-50">
+                    <p class="text-[11px] text-slate-400 mt-1">💡 PDF, 한글(HWP/HWPX), 엑셀, 이미지 등 모든 학습자료 업로드 지원</p>
+                </div>
+                <div id="admin-upload-status" class="text-xs mt-2 hidden font-bold text-center"></div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="closeAdminUploadModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs sm:text-sm font-bold rounded-xl transition">
+                        닫기
+                    </button>
+                    <button type="button" id="admin-upload-submit-btn" onclick="submitAdminUpload()" class="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-1.5">
+                        <span>📤</span> 업로드 시작
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(div);
+    div.addEventListener('click', (e) => {
+        if (e.target === div) closeAdminUploadModal();
+    });
+}
+
+function openAdminUploadModal(defaultCategory = 'accounting') {
+    let modal = document.getElementById('admin-upload-modal');
+    if (!modal) {
+        createAdminUploadModalElement();
+        modal = document.getElementById('admin-upload-modal');
+    }
+    if (modal) {
+        const catSelect = document.getElementById('admin-upload-category');
+        if (catSelect && defaultCategory) catSelect.value = defaultCategory;
+        const fileInput = document.getElementById('admin-upload-files');
+        if (fileInput) fileInput.value = '';
+        const statusEl = document.getElementById('admin-upload-status');
+        if (statusEl) { statusEl.innerText = ''; statusEl.className = 'text-xs mt-2 hidden font-bold text-center'; }
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+    }
+}
+
+function closeAdminUploadModal() {
+    const modal = document.getElementById('admin-upload-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
+
+async function submitAdminUpload() {
+    const catSelect = document.getElementById('admin-upload-category');
+    const fileInput = document.getElementById('admin-upload-files');
+    const statusEl = document.getElementById('admin-upload-status');
+    const submitBtn = document.getElementById('admin-upload-submit-btn');
+    
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert('업로드할 파일을 선택해주세요.');
+        return;
+    }
+    
+    const category = catSelect.value;
+    const files = Array.from(fileInput.files);
+    
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '업로드 진행 중... ⏳';
+    statusEl.classList.remove('hidden');
+    statusEl.className = 'text-xs mt-2 font-bold text-center text-blue-600 block';
+    
+    try {
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            statusEl.innerText = `[${i + 1}/${files.length}] ${file.name} 업로드 중...`;
+            
+            const chunkSize = 5 * 1024 * 1024;
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            
+            for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                const start = chunkIndex * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+                
+                const formData = new FormData();
+                formData.append('file', chunk);
+                formData.append('filename', file.name);
+                formData.append('category', category);
+                formData.append('grade', currentGrade);
+                formData.append('chunk_index', chunkIndex);
+                formData.append('total_chunks', totalChunks);
+                
+                const res = await fetch('?action=upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!res.ok) {
+                    throw new Error(`파일 ${file.name} 업로드 실패 (HTTP ${res.status})`);
+                }
+            }
+        }
+        
+        statusEl.className = 'text-xs mt-2 font-bold text-center text-emerald-600 block';
+        statusEl.innerText = `🎉 총 ${files.length}개 파일 업로드 완료!`;
+        await fetchFiles();
+        
+        setTimeout(() => {
+            closeAdminUploadModal();
+            window.showAlert(`자료가 성공적으로 등록되었습니다! (${files.length}건)`);
+        }, 800);
+        
+    } catch (err) {
+        console.error(err);
+        statusEl.className = 'text-xs mt-2 font-bold text-center text-rose-500 block';
+        statusEl.innerText = '❌ 오류: ' + (err.message || '업로드 중 문제가 발생했습니다.');
+        alert('업로드 오류: ' + err.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>📤</span> 업로드 시작';
+    }
+}
+
 function renderLoginSection() {
     const sec = document.getElementById('login-section');
     if (!sec) return;
     
-    const loggedUser = window.sessionStorage.getItem('learning_username');
-    // window.currentUser 가 없으면 sessionStorage 이름을 기반으로 간단히 표시 (API 상태 체크 전이라도)
+    let loggedUser = window.sessionStorage.getItem('learning_username');
+    if (!loggedUser) {
+        try {
+            const raw = localStorage.getItem('learning_user_info');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.username && (Date.now() - (parsed.last_active || 0) < 15 * 60 * 1000)) {
+                    loggedUser = parsed.username;
+                }
+            }
+        } catch(e) {}
+    }
+    
     const displayName = window.currentUser ? window.currentUser.username : loggedUser;
-    const isUserAdmin = window.currentUser ? window.currentUser.is_admin : isAdmin;
+    const adminActive = isCurrentAdminCheck();
+    if (adminActive) isAdmin = true;
     
     if (displayName) {
         // 로그인 상태
         let adminHtml = '';
-        if (isUserAdmin || isAdmin) {
+        if (adminActive) {
             adminHtml = `
-                <button class="btn btn-member-manage" onclick="openMemberAdminModal()" style="background:#4f46e5; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem;" title="회원 관리 대시보드">
+                <button class="btn btn-upload-modal" onclick="openAdminUploadModal()" style="background:#2563eb; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:4px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem; box-shadow:0 1px 2px rgba(0,0,0,0.1); transition:0.2s;" onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'" title="자료 올리기 (전산회계, 일반, 그림, 선생님 자료)">
+                    📁 파일 올리기
+                </button>
+                <button class="btn btn-member-manage" onclick="openMemberAdminModal()" style="background:#4f46e5; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:4px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem; transition:0.2s;" onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'" title="회원 관리 대시보드">
                     ⚙️ 관리자
                 </button>
+                <button class="btn btn-problem-report-manage" onclick="openProblemReportsAdminModal()" style="background:#dc2626; color:#ffffff; font-weight:700; border-radius:10px; padding:6px 13px; margin-right:6px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-size:0.85rem; transition:0.2s;" onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'" title="오류 문제 관리 대시보드">
+                    <span>🚨 오류관리</span><span id="nav-reports-count-badge" class="hidden text-[10px] bg-white text-rose-600 font-black px-1.5 py-0.2 rounded-full shadow-2xs"></span>
+                </button>
             `;
+            setTimeout(checkPendingProblemReportsCount, 100);
         }
         
         sec.innerHTML = `
-            <div style="display:flex; align-items:center; gap: 10px;">
+            <div style="display:flex; align-items:center; gap: 8px;">
                 ${adminHtml}
                 <div style="font-size: 0.9rem; font-weight: 700; color: #475569;">
-                    반갑습니다, <span style="color: #6366f1;">${displayName}</span>님 🌿
+                    반갑습니다, <span style="color: #6366f1;">${escapeHtml(displayName)}</span>님 🌿
                 </div>
                 <button onclick="openMyStatsModal()" style="background:#fffbeb; color:#d97706; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #fde68a; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#fef3c7'" onmouseout="this.style.background='#fffbeb'">
                     📊 내 학습 현황
                 </button>
-                <button class="btn btn-logout" onclick="AuthEngine.logout()" style="background:#f1f5f9; color:#64748b; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #e2e8f0; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                <button class="btn btn-logout" onclick="globalLogout()" style="background:#f1f5f9; color:#64748b; font-weight:700; border-radius:8px; padding:6px 12px; border:1px solid #e2e8f0; cursor:pointer; font-size:0.8rem; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
                     로그아웃
                 </button>
             </div>
         `;
     } else {
-        // 비로그인 상태 (자물쇠 화면이 뜰 것이므로 여기는 빈칸으로 둬도 무방)
-        sec.innerHTML = ``;
+        // 비로그인 상태 (회원가입/로그인 버튼 클릭 시 메인 모달 열기)
+        sec.innerHTML = `
+            <div style="display:flex; align-items:center; gap: 8px;">
+                <button onclick="openSiteLoginModal('login')" style="background:#6366f1; color:#fff; font-weight:700; border-radius:8px; padding:6px 14px; border:none; cursor:pointer; font-size:0.85rem; transition:0.2s;" onmouseover="this.style.background='#4f46e5'" onmouseout="this.style.background='#6366f1'">
+                    🔑 로그인
+                </button>
+                <button onclick="openSiteLoginModal('register')" style="background:#f1f5f9; color:#475569; font-weight:700; border-radius:8px; padding:6px 14px; border:1px solid #cbd5e1; cursor:pointer; font-size:0.85rem; transition:0.2s;" onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                    ✨ 간편가입
+                </button>
+            </div>
+        `;
     }
+}
+
+async function globalLogout() {
+    const confirmed = await window.showConfirm('로그아웃 하시겠습니까?', '로그아웃');
+    if (!confirmed) return;
+
+    try {
+        await fetch('api.php?action=learning_logout');
+        await fetch('api.php?action=logout');
+    } catch(e) {}
+
+    window.currentUser = null;
+    isAdmin = false;
+    try {
+        localStorage.clear();
+        sessionStorage.clear();
+    } catch(e) {}
+
+    renderLoginSection();
+    toggleUploadSections();
+    
+    // 로그아웃 즉시 로그인 게이트 전면 표시
+    const gate = document.getElementById('site-lock-gate');
+    if (gate) {
+        gate.classList.remove('hidden');
+        gate.style.display = 'flex';
+        const closeBtn = document.getElementById('site-lock-close-btn');
+        if (closeBtn) closeBtn.classList.add('hidden');
+    }
+    location.reload();
 }
 
 async function togglePrivateMode() {
@@ -484,19 +817,22 @@ async function togglePrivateMode() {
 }
 
 function toggleUploadSections() {
+    const adminActive = isCurrentAdminCheck();
+    if (adminActive) isAdmin = true;
+    
     const sections = document.querySelectorAll('.upload-section');
     sections.forEach(sec => {
-        if (isAdmin) sec.classList.add('active');
+        if (adminActive) sec.classList.add('active');
         else sec.classList.remove('active');
     });
     const deleteBtns = document.querySelectorAll('.btn-delete');
     deleteBtns.forEach(btn => {
-        if (isAdmin) btn.classList.add('active');
+        if (adminActive) btn.classList.add('active');
         else btn.classList.remove('active');
     });
     const editBtns = document.querySelectorAll('.btn-edit-title');
     editBtns.forEach(btn => {
-        if (isAdmin) btn.classList.remove('hidden');
+        if (adminActive) btn.classList.remove('hidden');
         else btn.classList.add('hidden');
     });
 }
@@ -918,7 +1254,8 @@ async function savePastedImage() {
 }
 
 // --- 1급 맞춤 코스 학습 (Learning Course) 뷰 전환 라우팅 ---
-function openLearningCourseApp() { console.log('openLearningCourseApp called'); console.log('mainView, quizView, learningView elements:', document.getElementById('main-content-view'), document.getElementById('quiz-content-view'), document.getElementById('learning-course-view'));
+function openLearningCourseApp() {
+    try { localStorage.setItem('active_view', 'learning'); } catch(e) {}
     const mainView = document.getElementById('main-content-view');
     const quizView = document.getElementById('quiz-content-view');
     const learningView = document.getElementById('learning-course-view');
@@ -944,6 +1281,7 @@ function openLearningCourseApp() { console.log('openLearningCourseApp called'); 
 }
 
 function closeLearningCourseApp() {
+    try { localStorage.removeItem('active_view'); } catch(e) {}
     document.body.classList.remove('learning-app-active');
     const mainView = document.getElementById('main-content-view');
     const learningView = document.getElementById('learning-course-view');
@@ -1305,7 +1643,7 @@ let currentDetailSubTab = 'sections';
 
 function openUserDetailPopup(userId) {
     if (!memberAdminData || !memberAdminData.users) return;
-    const user = memberAdminData.users.find(u => u.id === userId);
+    const user = memberAdminData.users.find(u => String(u.id) === String(userId));
     if (!user) return;
 
     selectedAdminUser = user;
@@ -1673,41 +2011,416 @@ async function renderDownloadLogs() {
 // --- 세션 복원 (새로고침 시 PHP 세션 기반으로 자동 로그인 유지) ---
 async function restoreSessionFromServer() {
     try {
+        const storedUser = window.sessionStorage.getItem('learning_username');
         const res = await fetch('api.php?action=learning_status');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.is_logged_in && data.user) {
-            const username = data.user.username;
-            window.currentUser = data.user;
-            window.sessionStorage.setItem('learning_username', username);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.is_logged_in && data.user) {
+                const username = data.user.username;
+                window.currentUser = data.user;
+                window.sessionStorage.setItem('learning_username', username);
+                renderLoginSection();
+                if (typeof syncUserName === 'function') syncUserName(username);
+                return;
+            }
+        }
+        // PHP 세션 조회 지연/실패 시에도 sessionStorage에 로그인 정보가 남아있으면 로그인 상태 복원
+        if (storedUser) {
+            window.currentUser = { username: storedUser, is_admin: (storedUser === '이우성' || storedUser === 'admin') };
             renderLoginSection();
-            if (typeof syncUserName === 'function') syncUserName(username);
-        } else if (!data.is_logged_in) {
-            // PHP 세션이 만료된 경우 클라이언트 상태도 정리
-            window.currentUser = null;
-            window.sessionStorage.removeItem('learning_username');
-            renderLoginSection();
+            if (typeof syncUserName === 'function') syncUserName(storedUser);
         }
     } catch(e) {
-        console.warn('세션 복원 실패:', e);
+        console.warn('세션 복원 시 경고:', e);
+        const storedUser = window.sessionStorage.getItem('learning_username');
+        if (storedUser) {
+            window.currentUser = { username: storedUser, is_admin: (storedUser === '이우성' || storedUser === 'admin') };
+            renderLoginSection();
+        }
     }
 }
 
-// --- 15분 idle 자동 로그아웃 타이머 ---
-let _idleTimer = null;
-const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15분
+// =========================================================================
+// 문제 오류 신고 및 관리자 격리/수정완료 시스템
+// =========================================================================
+let currentReportingTarget = null;
+let currentAdminReports = [];
+let currentAdminReportFilter = 'reported';
+
+function openProblemReportModal(quizType) {
+    let targetExcel = '';
+    let targetProblemId = '';
+    let targetTitle = '';
+
+    if (quizType === 'journal') {
+        targetExcel = (typeof currentLoadingJournalFile !== 'undefined' && currentLoadingJournalFile ? currentLoadingJournalFile : '2급_분개문제(AI).xlsx').replace(/^excels\//, '');
+        targetProblemId = (typeof currentProblemId !== 'undefined' && currentProblemId !== null ? currentProblemId : '');
+        if (typeof problemsMap !== 'undefined' && targetProblemId) {
+            const p = problemsMap.get(targetProblemId);
+            targetTitle = (p && typeof p === 'object' ? p.text : (p || '')) + '';
+        }
+    } else {
+        targetExcel = (typeof currentLoadingTheoryFile !== 'undefined' && currentLoadingTheoryFile ? currentLoadingTheoryFile : '2급_필기문제(AI).xlsx').replace(/^excels\//, '');
+        targetProblemId = (typeof currentTheoryId !== 'undefined' && currentTheoryId !== null ? currentTheoryId : '');
+        if (typeof theoryProblemsMap !== 'undefined' && targetProblemId) {
+            const p = theoryProblemsMap.get(targetProblemId);
+            targetTitle = (p && typeof p === 'object' ? (p.question || p.text || '') : (p || '')) + '';
+        }
+    }
+
+    if (!targetProblemId) {
+        alert('현재 선택된 문제 정보를 찾을 수 없습니다.');
+        return;
+    }
+
+    currentReportingTarget = {
+        quiz_type: quizType,
+        excel_file: targetExcel,
+        problem_id: targetProblemId,
+        problem_title: targetTitle
+    };
+
+    const modal = document.getElementById('problem-report-modal');
+    const infoEl = document.getElementById('report-target-info');
+    const detailEl = document.getElementById('report-reason-detail');
+    if (infoEl) {
+        infoEl.innerHTML = `<span class="text-indigo-600 font-bold">[${escapeHtml(targetExcel)}]</span> <span class="text-rose-600 font-black">#${escapeHtml(String(targetProblemId))}</span>: ${escapeHtml(targetTitle.slice(0, 100))}${targetTitle.length > 100 ? '...' : ''}`;
+    }
+    if (detailEl) detailEl.value = '';
+
+    const radios = document.querySelectorAll('input[name="report-reason-type"]');
+    if (radios.length > 0) radios[0].checked = true;
+
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeProblemReportModal() {
+    const modal = document.getElementById('problem-report-modal');
+    if (modal) modal.classList.add('hidden');
+    currentReportingTarget = null;
+}
+
+async function submitProblemReport() {
+    if (!currentReportingTarget) return;
+
+    const radios = document.querySelectorAll('input[name="report-reason-type"]');
+    let reasonType = '기타 오류';
+    radios.forEach(r => { if (r.checked) reasonType = r.value; });
+
+    const detail = (document.getElementById('report-reason-detail')?.value || '').trim();
+    const btn = document.getElementById('submit-problem-report-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = '제출 중...';
+    }
+
+    try {
+        const username = window.currentUser ? window.currentUser.username : (sessionStorage.getItem('learning_username') || '익명학습자');
+        const res = await fetch('api.php?action=problem_report_submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                excel_file: currentReportingTarget.excel_file,
+                quiz_type: currentReportingTarget.quiz_type,
+                problem_id: currentReportingTarget.problem_id,
+                problem_title: currentReportingTarget.problem_title,
+                reason_type: reasonType,
+                reason_detail: detail,
+                reporter: username
+            })
+        });
+        const result = await res.json();
+        if (result.success) {
+            const pId = String(currentReportingTarget.problem_id);
+            if (currentReportingTarget.quiz_type === 'journal') {
+                if (typeof problemIds !== 'undefined') problemIds = problemIds.filter(id => String(id) !== pId);
+                if (typeof unusedProblemIds !== 'undefined') unusedProblemIds = unusedProblemIds.filter(id => String(id) !== pId);
+            } else {
+                if (typeof theoryProblemIds !== 'undefined') theoryProblemIds = theoryProblemIds.filter(id => String(id) !== pId);
+                if (typeof unusedTheoryIds !== 'undefined') unusedTheoryIds = unusedTheoryIds.filter(id => String(id) !== pId);
+            }
+
+            closeProblemReportModal();
+            alert('🚨 오류 신고가 접수되었습니다!\n관리자 검토 및 수정 완료 시까지 본 문제는 출제 대상에서 즉시 제외(격리)됩니다. 소중한 제보 감사합니다.');
+            checkPendingProblemReportsCount();
+        } else {
+            alert('신고 접수 실패: ' + (result.message || '서버 오류'));
+        }
+    } catch(e) {
+        alert('신고 접수 통신 오류: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>🚨</span><span>신고 제출하기</span>';
+        }
+    }
+}
+
+async function openProblemReportsAdminModal() {
+    const modal = document.getElementById('admin-problem-reports-modal');
+    if (modal) modal.classList.remove('hidden');
+    await loadAdminProblemReports();
+}
+
+function closeAdminProblemReportsModal() {
+    const modal = document.getElementById('admin-problem-reports-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function loadAdminProblemReports() {
+    const container = document.getElementById('admin-reports-table-container');
+    const badgeStatus = document.getElementById('admin-reports-badge-status');
+    if (container) container.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs font-semibold">오류 신고 내역을 불러오는 중입니다...</div>';
+
+    try {
+        const res = await fetch('api.php?action=problem_reports_get');
+        const data = await res.json();
+        if (data.success) {
+            currentAdminReports = data.reports || [];
+            if (badgeStatus) {
+                badgeStatus.innerText = `미해결: ${data.pending_count || 0}건`;
+            }
+            renderAdminReportsList();
+            updateAdminReportsBadgeInNav(data.pending_count || 0);
+        } else {
+            if (container) container.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs font-bold">${escapeHtml(data.message || '목록을 불러오지 못했습니다.')}</div>`;
+        }
+    } catch(e) {
+        if (container) container.innerHTML = `<div class="p-6 text-center text-rose-500 text-xs font-bold">오류: ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+function filterAdminReports(filterType) {
+    currentAdminReportFilter = filterType;
+    ['all', 'reported', 'resolved'].forEach(t => {
+        const btn = document.getElementById(`btn-rep-filter-${t}`);
+        if (btn) {
+            if (t === filterType) {
+                btn.className = 'px-3 py-1 rounded-lg bg-rose-500 text-white transition';
+            } else {
+                btn.className = 'px-3 py-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+            }
+        }
+    });
+    renderAdminReportsList();
+}
+
+function renderAdminReportsList() {
+    const container = document.getElementById('admin-reports-table-container');
+    if (!container) return;
+
+    let list = currentAdminReports.slice();
+    if (currentAdminReportFilter !== 'all') {
+        list = list.filter(r => r.status === currentAdminReportFilter);
+    }
+
+    if (list.length === 0) {
+        container.innerHTML = '<div class="p-8 text-center text-slate-400 text-xs font-semibold">해당 조건의 신고 내역이 없습니다. 🌿</div>';
+        return;
+    }
+
+    list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+    let html = '';
+    list.forEach(item => {
+        const isPending = item.status === 'reported';
+        const statusBadge = isPending 
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-extrabold bg-rose-100 text-rose-700">격리중 (미해결)</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-extrabold bg-emerald-100 text-emerald-700">수정완료 (출제정상)</span>';
+
+        html += `
+            <div class="p-4 sm:p-5 hover:bg-slate-50/70 transition flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs">
+                <div class="space-y-1.5 flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        ${statusBadge}
+                        <span class="font-bold text-slate-700">${escapeHtml(item.excel_file || '')}</span>
+                        <span class="font-extrabold text-indigo-600">#${escapeHtml(String(item.problem_id || ''))}</span>
+                        <span class="text-slate-400 text-[11px]">${escapeHtml(item.created_at || '')}</span>
+                        <span class="text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">제보: ${escapeHtml(item.reporter || '익명')}</span>
+                    </div>
+                    <div class="font-bold text-slate-800 text-sm truncate" title="${escapeHtml(item.problem_title || '')}">
+                        ${escapeHtml(item.problem_title || '(제목 없음)')}
+                    </div>
+                    <div class="bg-amber-50/60 border border-amber-200/60 p-2.5 rounded-xl text-slate-700 space-y-1">
+                        <div class="font-bold text-amber-900 flex items-center gap-1.5">
+                            <span>⚠️ 신고 유형:</span>
+                            <span class="text-rose-600 font-extrabold">${escapeHtml(item.reason_type || '')}</span>
+                        </div>
+                        ${item.reason_detail ? `<div class="text-slate-600 whitespace-pre-wrap mt-1">${escapeHtml(item.reason_detail)}</div>` : '<div class="text-slate-400 italic mt-1">상세 내용 없음</div>'}
+                    </div>
+                    ${item.resolved_at ? `<div class="text-[11px] text-emerald-600 font-semibold">✓ 수정완료 시각: ${escapeHtml(item.resolved_at)}</div>` : ''}
+                </div>
+                <div class="flex sm:flex-col gap-2 flex-shrink-0 items-end justify-end pt-1 sm:pt-0">
+                    ${isPending ? `
+                        <button onclick="resolveProblemReport('${escapeHtml(item.id)}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-1 whitespace-nowrap">
+                            <span>✅</span><span>수정 완료(출제 재개)</span>
+                        </button>
+                    ` : `
+                        <span class="text-[11px] text-emerald-600 font-bold px-2 py-1 bg-emerald-50 rounded-lg">정상 출제 중</span>
+                    `}
+                    <button onclick="deleteProblemReport('${escapeHtml(item.id)}')" class="px-2.5 py-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg font-bold transition text-[11px] whitespace-nowrap">
+                        삭제
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+async function resolveProblemReport(reportId) {
+    if (!confirm('이 문제를 수정 완료 처리하시겠습니까?\\n처리 시 격리가 해제되어 학생들의 랜덤 출제 풀에 다시 복귀합니다.')) return;
+
+    try {
+        const res = await fetch('api.php?action=problem_report_resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_id: reportId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('수정 완료 처리되었습니다. 문제가 다시 정상 출제 풀에 복귀합니다.');
+            await loadAdminProblemReports();
+        } else {
+            alert('처리 실패: ' + (data.message || '오류 발생'));
+        }
+    } catch(e) {
+        alert('통신 오류: ' + e.message);
+    }
+}
+
+async function deleteProblemReport(reportId) {
+    if (!confirm('신고 내역을 완전히 삭제하시겠습니까?')) return;
+
+    try {
+        const res = await fetch('api.php?action=problem_report_delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ report_id: reportId })
+        });
+        const data = await res.json();
+        if (data.success) {
+            await loadAdminProblemReports();
+        } else {
+            alert('삭제 실패');
+        }
+    } catch(e) {
+        alert('통신 오류: ' + e.message);
+    }
+}
+
+async function checkPendingProblemReportsCount() {
+    try {
+        const res = await fetch('api.php?action=problem_reports_get');
+        const data = await res.json();
+        if (data.success) {
+            updateAdminReportsBadgeInNav(data.pending_count || 0);
+        }
+    } catch(e) {}
+}
+
+function updateAdminReportsBadgeInNav(pendingCount) {
+    const badge = document.getElementById('nav-reports-count-badge');
+    if (badge) {
+        if (pendingCount > 0) {
+            badge.innerText = pendingCount + '건';
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    }
+}
+
+// --- 15분 idle 자동 로그아웃 & 1분전 커스텀 모달 경고 타이머 ---
+let _idleWarnTimer = null;
+let _idleLogoutTimer = null;
+let _idleCountdownInterval = null;
+let _idleRemainingSec = 60;
+
+const IDLE_WARN_TIME_MS = 14 * 60 * 1000; // 14분 (1분 전 경고)
+const IDLE_LOGOUT_TIME_MS = 15 * 60 * 1000; // 15분 (최종 자동 로그아웃)
 
 function resetIdleTimer() {
-    clearTimeout(_idleTimer);
-    _idleTimer = setTimeout(async () => {
-        const username = window.sessionStorage.getItem('learning_username');
-        if (!username) return;
-        try { await fetch('api.php?action=learning_logout'); } catch(e) {}
-        window.currentUser = null;
-        window.sessionStorage.removeItem('learning_username');
-        renderLoginSection();
-        await window.showAlert('15분 이상 활동이 없어 자동으로 로그아웃되었습니다.', '자동 로그아웃');
-    }, IDLE_TIMEOUT_MS);
+    clearTimeout(_idleWarnTimer);
+    clearTimeout(_idleLogoutTimer);
+    clearInterval(_idleCountdownInterval);
+
+    const username = window.sessionStorage.getItem('learning_username');
+    if (!username && !window.currentUser) return;
+
+    // 14분 후 1분전 경고 커스텀 모달 노출
+    _idleWarnTimer = setTimeout(() => {
+        showIdleWarningModal();
+    }, IDLE_WARN_TIME_MS);
+
+    // 15분 후 최종 자동 로그아웃
+    _idleLogoutTimer = setTimeout(async () => {
+        await executeIdleLogout();
+    }, IDLE_LOGOUT_TIME_MS);
+}
+
+function showIdleWarningModal() {
+    const modal = document.getElementById('idle-warning-modal');
+    if (!modal) return;
+    _idleRemainingSec = 60;
+    const countEl = document.getElementById('idle-countdown-seconds');
+    if (countEl) countEl.textContent = '60초 후';
+
+    modal.style.display = 'flex';
+
+    clearInterval(_idleCountdownInterval);
+    _idleCountdownInterval = setInterval(() => {
+        _idleRemainingSec--;
+        if (countEl) countEl.textContent = `${_idleRemainingSec}초 후`;
+        if (_idleRemainingSec <= 0) {
+            clearInterval(_idleCountdownInterval);
+        }
+    }, 1000);
+}
+
+async function extendUserSession() {
+    clearTimeout(_idleWarnTimer);
+    clearTimeout(_idleLogoutTimer);
+    clearInterval(_idleCountdownInterval);
+
+    const modal = document.getElementById('idle-warning-modal');
+    if (modal) modal.style.display = 'none';
+
+    try {
+        await fetch('api.php?action=learning_status');
+    } catch(e) {}
+
+    resetIdleTimer();
+}
+
+async function executeIdleLogout() {
+    clearTimeout(_idleWarnTimer);
+    clearTimeout(_idleLogoutTimer);
+    clearInterval(_idleCountdownInterval);
+
+    const modal = document.getElementById('idle-warning-modal');
+    if (modal) modal.style.display = 'none';
+
+    try {
+        await fetch('api.php?action=learning_logout');
+    } catch (e) {}
+
+    window.currentUser = null;
+    window.sessionStorage.removeItem('learning_username');
+    try {
+        localStorage.removeItem('learning_user_info');
+        localStorage.removeItem('active_view');
+    } catch(e) {}
+
+    renderLoginSection();
+    if (window.LearningEngine && typeof window.LearningEngine.renderAuthView === 'function') {
+        window.LearningEngine.renderAuthView('login');
+    }
+
+    if (typeof window.showAlert === 'function') {
+        await window.showAlert('15분간 비활동 상태가 유지되어 안전하게 자동 로그아웃되었습니다.', '자동 로그아웃 완료');
+    }
 }
 
 function startIdleTimer() {
