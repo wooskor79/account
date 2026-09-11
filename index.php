@@ -211,11 +211,11 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
         };
     })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/cfb@1.2.2/dist/cfb.min.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=<?php echo time(); ?>">
+    <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/cfb@1.2.2/dist/cfb.min.js"></script>
+    <link rel="stylesheet" href="css/style.css?v=20260910_v2">
     <style>
         #quiz-menu-dropdown {
             transform-origin: top right;
@@ -236,8 +236,8 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
 <body>
 
     <!-- 첫 화면 통합 로그인/회원가입 게이트 (비공개 모드 및 공통 인증) -->
-    <div id="site-lock-gate" class="<?php echo $show_lock_gate ? '' : 'hidden'; ?> fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/90 backdrop-blur-md px-4 overflow-y-auto">
-        <div class="relative bg-white rounded-3xl shadow-2xl p-7 sm:p-9 max-w-sm sm:max-w-md w-full text-center border border-slate-100 transition-all transform scale-100 my-8">
+    <div id="site-lock-gate" class="<?php echo $show_lock_gate ? '' : 'hidden'; ?> fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/85 px-4 overflow-y-auto">
+        <div class="relative bg-white rounded-3xl shadow-2xl p-7 sm:p-9 max-w-sm sm:max-w-md w-full text-center border border-slate-100 my-8">
             <button type="button" onclick="closeSiteLoginModal()" id="site-lock-close-btn" class="absolute right-5 top-5 text-slate-400 hover:text-slate-600 text-2xl font-bold p-1 leading-none transition <?php echo $show_lock_gate ? 'hidden' : ''; ?>" title="닫기">&times;</button>
             <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-inner">
                 🔐
@@ -258,14 +258,14 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">아이디 (이름)</label>
                     <input type="text" id="auth-login-username" placeholder="예: 홍길동" 
-                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition"
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white"
                         autofocus>
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호</label>
                     <div class="relative">
                         <input type="password" id="auth-login-password" placeholder="비밀번호 입력" 
-                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition"
+                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white"
                             autocomplete="current-password">
                         <button type="button" onclick="AuthEngine.togglePassword('auth-login-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-70 hover:opacity-100 transition" title="비밀번호 보기/숨기기">🙈</button>
                     </div>
@@ -282,13 +282,13 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">아이디 (이름)</label>
                     <input type="text" id="auth-reg-username" placeholder="사용할 아이디(이름)를 입력하세요" 
-                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                        class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white">
                 </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호 (4자리 이상)</label>
                     <div class="relative">
                         <input type="password" id="auth-reg-password" placeholder="비밀번호 입력" oninput="AuthEngine.checkPasswordMatch()"
-                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white">
                         <button type="button" onclick="AuthEngine.togglePassword('auth-reg-password', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-70 hover:opacity-100 transition" title="비밀번호 보기/숨기기">🙈</button>
                     </div>
                 </div>
@@ -296,7 +296,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                     <label class="block text-xs font-bold text-slate-600 mb-1 ml-1">비밀번호 확인</label>
                     <div class="relative">
                         <input type="password" id="auth-reg-password-confirm" placeholder="비밀번호 다시 입력" oninput="AuthEngine.checkPasswordMatch()"
-                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white transition">
+                            class="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-bold text-slate-800 bg-slate-50 focus:bg-white">
                         <button type="button" onclick="AuthEngine.togglePassword('auth-reg-password-confirm', this)" class="absolute right-3 top-1/2 -translate-y-1/2 text-lg opacity-70 hover:opacity-100 transition" title="비밀번호 보기/숨기기">🙈</button>
                     </div>
                     <p id="auth-reg-match-msg" class="text-[11px] font-bold mt-1.5 ml-1 hidden"></p>
@@ -337,45 +337,33 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                     <div id="quiz-menu-dropdown" class="hidden absolute right-0 left-auto mt-3 w-64 max-w-[calc(100vw-32px)] bg-white rounded-xl shadow-xl border border-slate-100 py-2 z-[99999]">
                         <!-- 2급 문제풀이 메뉴 (기초 모드 시 노출) -->
                         <div id="quiz-menu-items-grade2">
-                            <a onclick="openQuizApp('journal')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
-                                📝 1. 2급 분개문제 (AI)
+                            <a onclick="openQuizApp('journal', '회계2급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
+                                📝 1. 2급 전산회계 기출 분개
                             </a>
-                            <a onclick="openQuizApp('theory')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer border-b border-slate-100">
-                                📖 2. 2급 필기문제 (AI)
+                            <a onclick="openQuizApp('theory', '회계2급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer border-b border-slate-100">
+                                📖 2. 2급 전산회계 기출 필기
                             </a>
                             <a onclick="openQuizApp('journal', '전산회계2급책')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
                                 📝 3. 2급 전산회계책 분개
                             </a>
-                            <a onclick="openQuizApp('theory', '전산회계2급책')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer border-b border-slate-100">
+                            <a onclick="openQuizApp('theory', '전산회계2급책')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer">
                                 📖 4. 2급 전산회계책 필기
-                            </a>
-                            <a onclick="openQuizApp('journal', '회계2급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
-                                📝 5. 2급 전산회계 기출 분개
-                            </a>
-                            <a onclick="openQuizApp('theory', '회계2급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer">
-                                📖 6. 2급 전산회계 기출 필기
                             </a>
                         </div>
 
                         <!-- 1급 문제풀이 메뉴 (중급 모드 시 노출) -->
                         <div id="quiz-menu-items-grade1" class="hidden">
-                            <a onclick="openQuizApp('journal', '1급')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
-                                📝 1. 1급 분개문제 (AI)
+                            <a onclick="openQuizApp('journal', '회계1급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
+                                📝 1. 1급 전산회계 기출 분개
                             </a>
-                            <a onclick="openQuizApp('theory', '1급')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer border-b border-slate-100">
-                                📖 2. 1급 필기문제 (AI)
+                            <a onclick="openQuizApp('theory', '회계1급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer border-b border-slate-100">
+                                📖 2. 1급 전산회계 기출 필기
                             </a>
                             <a onclick="openQuizApp('journal', '전산회계1급책')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
                                 📝 3. 1급 전산회계책 분개
                             </a>
-                            <a onclick="openQuizApp('theory', '전산회계1급책')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer border-b border-slate-100">
+                            <a onclick="openQuizApp('theory', '전산회계1급책')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer">
                                 📖 4. 1급 전산회계책 필기
-                            </a>
-                            <a onclick="openQuizApp('journal', '회계1급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-600 cursor-pointer border-b border-slate-100">
-                                📝 5. 1급 전산회계 기출 분개
-                            </a>
-                            <a onclick="openQuizApp('theory', '회계1급기출')" class="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer">
-                                📖 6. 1급 전산회계 기출 필기
                             </a>
                         </div>
                     </div>
@@ -417,7 +405,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                                 <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('accounting')" title="섹션 제목 변경">✏️</button>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('accounting')" title="전산회계 자료 올리기"><span>➕</span><span>올리기</span></button>
+                                <button class="btn-quick-upload hidden px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('accounting')" title="전산회계 자료 올리기"><span>➕</span><span>올리기</span></button>
                                 <div class="view-controls">
                                     <button class="btn-view" data-view="view-1" onclick="changeView('accounting', 'view-1', this)">1</button>
                                     <button class="btn-view" data-view="view-2" onclick="changeView('accounting', 'view-2', this)">2</button>
@@ -437,7 +425,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                                 <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('general')" title="섹션 제목 변경">✏️</button>
                             </div>
                             <div class="flex items-center gap-1.5">
-                                <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('general')" title="일반 자료 올리기"><span>➕</span><span>올리기</span></button>
+                                <button class="btn-quick-upload hidden px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('general')" title="일반 자료 올리기"><span>➕</span><span>올리기</span></button>
                                 <div class="view-controls">
                                     <button class="btn-view" data-view="view-1" onclick="changeView('general', 'view-1', this)">1</button>
                                     <button class="btn-view" data-view="view-2" onclick="changeView('general', 'view-2', this)">2</button>
@@ -461,7 +449,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                             <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('drawing')" title="섹션 제목 변경">✏️</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('drawing')" title="그림 자료 올리기"><span>➕</span><span>올리기</span></button>
+                            <button class="btn-quick-upload hidden px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('drawing')" title="그림 자료 올리기"><span>➕</span><span>올리기</span></button>
                             <div class="view-controls">
                                 <button class="btn-view" data-view="view-1" onclick="changeView('drawing', 'view-1', this)">1</button>
                                 <button class="btn-view" data-view="view-2" onclick="changeView('drawing', 'view-2', this)">2</button>
@@ -490,7 +478,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                             <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('seohee')" title="섹션 제목 변경">✏️</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('seohee')" title="이서희선생님 자료 올리기"><span>➕</span><span>올리기</span></button>
+                            <button class="btn-quick-upload hidden px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('seohee')" title="이서희선생님 자료 올리기"><span>➕</span><span>올리기</span></button>
                             <div class="view-controls">
                                 <button class="btn-view" data-view="view-1" onclick="changeView('seohee', 'view-1', this)">1</button>
                                 <button class="btn-view" data-view="view-2" onclick="changeView('seohee', 'view-2', this)">2</button>
@@ -513,7 +501,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                             <button class="btn-edit-title text-xs text-slate-400 hover:text-indigo-600 transition hidden" onclick="editSectionTitle('heera')" title="섹션 제목 변경">✏️</button>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <button class="btn-quick-upload px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('heera')" title="우승현선생님 자료 올리기"><span>➕</span><span>올리기</span></button>
+                            <button class="btn-quick-upload hidden px-2 py-0.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200 transition flex items-center gap-0.5 shadow-2xs" onclick="openAdminUploadModal('heera')" title="우승현선생님 자료 올리기"><span>➕</span><span>올리기</span></button>
                             <div class="view-controls">
                                 <button class="btn-view" data-view="view-1" onclick="changeView('heera', 'view-1', this)">1</button>
                                 <button class="btn-view" data-view="view-2" onclick="changeView('heera', 'view-2', this)">2</button>
@@ -1354,6 +1342,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                     if(typeof syncUserName === 'function') syncUserName(username);
                     if(typeof toggleUploadSections === 'function') toggleUploadSections();
                     if(typeof renderLoginSection === 'function') renderLoginSection();
+                    if(typeof window.loadMainAppData === 'function') window.loadMainAppData();
                     await window.showAlert("로그인 성공! 환영합니다.");
                 } else {
                     errEl.innerText = data.message;
@@ -1401,6 +1390,7 @@ $show_lock_gate = !$is_admin && !$is_learning_user;
                     if(typeof syncUserName === 'function') syncUserName(username);
                     if(typeof toggleUploadSections === 'function') toggleUploadSections();
                     if(typeof renderLoginSection === 'function') renderLoginSection();
+                    if(typeof window.loadMainAppData === 'function') window.loadMainAppData();
                     await window.showAlert("회원가입 완료! 자동으로 로그인되었습니다.", "환영합니다");
                     const gate = document.getElementById('site-lock-gate');
                     if (gate) {

@@ -162,6 +162,7 @@ $upload_dir = $base_share . '/' . $grade;
 $video_dir = $base_video . '/' . $grade;
 $general_dir = $upload_dir . '/일반자료';
 $drawing_dir = $upload_dir . '/그림자료'; 
+$accounting_dir = $upload_dir . '/전산회계자료';
 $data_file = __DIR__ . '/data/files_' . $grade . '.json';
 
 // grade2 초기 마이그레이션 및 자동 복구: files_grade2.json이 없거나 비어있으면 기존 files.json 복사
@@ -215,6 +216,7 @@ if (!file_exists($upload_dir)) @mkdir($upload_dir, 0777, true);
 if (!file_exists($video_dir)) @mkdir($video_dir, 0777, true);
 if (!file_exists($general_dir)) @mkdir($general_dir, 0777, true);
 if (!file_exists($drawing_dir)) @mkdir($drawing_dir, 0777, true); 
+if (!file_exists($accounting_dir)) @mkdir($accounting_dir, 0777, true); 
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 if ($action) {
@@ -238,6 +240,9 @@ if ($action) {
                 if (file_exists($upload_dir . '/' . $path)) {
                     $target_file = realpath($upload_dir . '/' . $path);
                     $base_dir = realpath($upload_dir);
+                } else if (file_exists($accounting_dir . '/' . $path)) {
+                    $target_file = realpath($accounting_dir . '/' . $path);
+                    $base_dir = realpath($accounting_dir);
                 } else if (file_exists(__DIR__ . '/uploads/' . $path)) {
                     $target_file = realpath(__DIR__ . '/uploads/' . $path);
                     $base_dir = realpath(__DIR__ . '/uploads');
@@ -830,6 +835,69 @@ if ($action) {
         $filtered_db = array_filter($db, function($item) {
             return $item['category'] !== 'general' && $item['category'] !== 'drawing';
         });
+
+        // 1) accounting_dir (전산회계자료 폴더) 실제 파일 스캔 및 DB 누락분 자동 등록
+        $need_db_update = false;
+        if (file_exists($accounting_dir)) {
+            $existing_filenames = [];
+            foreach ($db as $item) {
+                if (isset($item['saved_filename'])) $existing_filenames[$item['saved_filename']] = true;
+                if (isset($item['filename'])) $existing_filenames[$item['filename']] = true;
+            }
+            $scanned_acc = array_diff(scandir($accounting_dir), ['..', '.', '@eaDir', '#recycle']);
+            foreach ($scanned_acc as $item) {
+                if (strpos($item, '.') === 0 || substr($item, -5) === '.part') continue;
+                $item_path = $accounting_dir . '/' . $item;
+                if (is_file($item_path) && !isset($existing_filenames[$item])) {
+                    $new_entry = [
+                        'id' => uniqid('', true),
+                        'filename' => $item,
+                        'saved_filename' => $item,
+                        'category' => 'accounting',
+                        'upload_time' => date('Y-m-d H:i:s', filemtime($item_path)),
+                        'size' => filesize($item_path)
+                    ];
+                    $db[] = $new_entry;
+                    $filtered_db[] = $new_entry;
+                    $need_db_update = true;
+                }
+            }
+        }
+
+        // 2) upload_dir 루트 디렉토리 스캔 (전산회계자료, 일반자료, 그림자료 폴더 제외)
+        if (file_exists($upload_dir)) {
+            $existing_filenames = [];
+            foreach ($db as $item) {
+                if (isset($item['saved_filename'])) $existing_filenames[$item['saved_filename']] = true;
+                if (isset($item['filename'])) $existing_filenames[$item['filename']] = true;
+            }
+            $scanned_root = array_diff(scandir($upload_dir), ['..', '.', '@eaDir', '#recycle', '일반자료', '그림자료', '전산회계자료']);
+            foreach ($scanned_root as $item) {
+                if (strpos($item, '.') === 0 || substr($item, -5) === '.part') continue;
+                $item_path = $upload_dir . '/' . $item;
+                if (is_file($item_path) && !isset($existing_filenames[$item])) {
+                    // 미등록 파일 발견 -> 파일명 패턴에 맞춘 카테고리 지정
+                    $auto_cat = 'accounting';
+                    if (preg_match('/^\d+(\.\d+)?\.xlsx$/i', $item) || strpos($item, '분개') !== false) {
+                        $auto_cat = 'heera';
+                    }
+                    $new_entry = [
+                        'id' => uniqid('', true),
+                        'filename' => $item,
+                        'saved_filename' => $item,
+                        'category' => $auto_cat,
+                        'upload_time' => date('Y-m-d H:i:s', filemtime($item_path)),
+                        'size' => filesize($item_path)
+                    ];
+                    $db[] = $new_entry;
+                    $filtered_db[] = $new_entry;
+                    $need_db_update = true;
+                }
+            }
+        }
+        if ($need_db_update) {
+            write_db($data_file, $db);
+        }
         
         $general_files = [];
         if (file_exists($general_dir)) {
@@ -971,6 +1039,22 @@ if ($action) {
             } else if ($category === 'drawing') {
                 $target_path = $drawing_dir . '/' . $original_name;
                 rename($temp_path, $target_path);
+            } else if ($category === 'accounting') {
+                $target_path = $accounting_dir . '/' . $original_name;
+                rename($temp_path, $target_path);
+                
+                $file_id = uniqid('', true);
+                $saved_name = $original_name;
+                $db = read_db($data_file);
+                $db[] = [
+                    'id' => $file_id,
+                    'filename' => $original_name,
+                    'saved_filename' => $saved_name,
+                    'category' => $category,
+                    'upload_time' => date('Y-m-d H:i:s'),
+                    'size' => filesize($target_path)
+                ];
+                write_db($data_file, $db);
             } else {
                 $file_id = uniqid('', true);
                 $saved_name = $original_name;
@@ -1028,9 +1112,10 @@ if ($action) {
         $db = read_db($data_file);
         $updated_db = [];
         $found = false;
+        $target_item = null;
         
         foreach ($db as $item) {
-            if ($item['id'] === $file_id) { $found = true; continue; }
+            if ($item['id'] === $file_id) { $found = true; $target_item = $item; continue; }
             $updated_db[] = $item;
         }
         
@@ -1038,6 +1123,20 @@ if ($action) {
             http_response_code(404);
             echo json_encode(['error' => '파일을 찾을 수 없습니다.']);
             exit;
+        }
+
+        if ($target_item && isset($target_item['saved_filename'])) {
+            $del_file = $target_item['saved_filename'];
+            $possible_paths = [
+                $accounting_dir . '/' . $del_file,
+                $upload_dir . '/' . $del_file
+            ];
+            foreach ($possible_paths as $p) {
+                if (file_exists($p)) {
+                    @rename($p, dirname($p) . '/.deleted_' . $del_file);
+                    break;
+                }
+            }
         }
         
         write_db($data_file, $updated_db);
@@ -1068,15 +1167,21 @@ if ($action) {
             }
             if (!$file_info) { http_response_code(404); echo '파일을 찾을 수 없습니다.'; exit; }
             
-            $target_path = $upload_dir . '/' . $file_info['saved_filename'];
-            if (!file_exists($target_path)) {
-                if (file_exists(__DIR__ . '/uploads/' . $file_info['saved_filename'])) {
-                    $target_path = __DIR__ . '/uploads/' . $file_info['saved_filename'];
-                } else if (file_exists(__DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'])) {
-                    $target_path = __DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'];
-                }
+            $target_path = '';
+            if (isset($file_info['category']) && $file_info['category'] === 'accounting' && file_exists($accounting_dir . '/' . $file_info['saved_filename'])) {
+                $target_path = $accounting_dir . '/' . $file_info['saved_filename'];
+            } else if (file_exists($upload_dir . '/' . $file_info['saved_filename'])) {
+                $target_path = $upload_dir . '/' . $file_info['saved_filename'];
+            } else if (file_exists($accounting_dir . '/' . $file_info['saved_filename'])) {
+                $target_path = $accounting_dir . '/' . $file_info['saved_filename'];
+            } else if (file_exists(__DIR__ . '/uploads/' . $file_info['saved_filename'])) {
+                $target_path = __DIR__ . '/uploads/' . $file_info['saved_filename'];
+            } else if (file_exists(__DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'])) {
+                $target_path = __DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'];
+            } else if (file_exists(__DIR__ . '/uploads/' . $grade . '/전산회계자료/' . $file_info['saved_filename'])) {
+                $target_path = __DIR__ . '/uploads/' . $grade . '/전산회계자료/' . $file_info['saved_filename'];
             }
-            if (!file_exists($target_path)) { http_response_code(404); echo '실제 파일이 존재하지 않습니다.'; exit; }
+            if (!$target_path || !file_exists($target_path)) { http_response_code(404); echo '실제 파일이 존재하지 않습니다.'; exit; }
             $download_name = $file_info['filename'];
         }
         
@@ -1115,15 +1220,21 @@ if ($action) {
             }
             if (!$file_info) { http_response_code(404); echo '파일을 찾을 수 없습니다.'; exit; }
             
-            $target_path = $upload_dir . '/' . $file_info['saved_filename'];
-            if (!file_exists($target_path)) {
-                if (file_exists(__DIR__ . '/uploads/' . $file_info['saved_filename'])) {
-                    $target_path = __DIR__ . '/uploads/' . $file_info['saved_filename'];
-                } else if (file_exists(__DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'])) {
-                    $target_path = __DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'];
-                }
+            $target_path = '';
+            if (isset($file_info['category']) && $file_info['category'] === 'accounting' && file_exists($accounting_dir . '/' . $file_info['saved_filename'])) {
+                $target_path = $accounting_dir . '/' . $file_info['saved_filename'];
+            } else if (file_exists($upload_dir . '/' . $file_info['saved_filename'])) {
+                $target_path = $upload_dir . '/' . $file_info['saved_filename'];
+            } else if (file_exists($accounting_dir . '/' . $file_info['saved_filename'])) {
+                $target_path = $accounting_dir . '/' . $file_info['saved_filename'];
+            } else if (file_exists(__DIR__ . '/uploads/' . $file_info['saved_filename'])) {
+                $target_path = __DIR__ . '/uploads/' . $file_info['saved_filename'];
+            } else if (file_exists(__DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'])) {
+                $target_path = __DIR__ . '/uploads/' . $file_info['category'] . '/' . $file_info['saved_filename'];
+            } else if (file_exists(__DIR__ . '/uploads/' . $grade . '/전산회계자료/' . $file_info['saved_filename'])) {
+                $target_path = __DIR__ . '/uploads/' . $grade . '/전산회계자료/' . $file_info['saved_filename'];
             }
-            if (!file_exists($target_path)) { http_response_code(404); echo '실제 파일이 존재하지 않습니다.'; exit; }
+            if (!$target_path || !file_exists($target_path)) { http_response_code(404); echo '실제 파일이 존재하지 않습니다.'; exit; }
             $view_name = $file_info['filename'];
         }
         
@@ -1189,6 +1300,201 @@ if ($action) {
         header('Content-Length: ' . filesize($target_path));
         header('Content-Disposition: attachment; filename="' . rawurlencode(basename($target_path)) . '"');
         readfile($target_path);
+        exit;
+    }
+
+    // --- 고속 퀴즈 API (MariaDB DB 우선 조회, 로컬 JSON 캐시 2차, 엑셀 폴백) ---
+    if ($action === 'get_quiz') {
+        header('Content-Type: application/json; charset=utf-8');
+        $file = isset($_GET['file']) ? trim($_GET['file']) : '';
+        $file = basename($file); // 경로 트래버설 방지
+        
+        if (empty($file)) {
+            echo json_encode(['success' => false, 'message' => 'file 파라미터가 누락되었습니다.']);
+            exit;
+        }
+
+        $qtype = (strpos($file, '분개') !== false) ? 'journal' : 'theory';
+        
+        $problemsMapArr = [];
+        $answersMapArr = [];
+        $problemIds = [];
+        $dynamicAccounts = [];
+
+        // 1단계: MariaDB (quiz_questions 테이블) 우선 조회
+        if ($pdo) {
+            try {
+                $stmt = $pdo->prepare("SELECT * FROM quiz_questions WHERE file_key = :fkey ORDER BY question_no ASC");
+                $stmt->execute([':fkey' => $file]);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                if ($rows && count($rows) > 0) {
+                    $acc_set = [];
+                    foreach ($rows as $r) {
+                        $pid = (string)$r['question_no'];
+                        $problemIds[] = $pid;
+                        
+                        if ($qtype === 'theory') {
+                            $problemsMapArr[] = [
+                                $pid,
+                                [
+                                    'text' => $r['question'],
+                                    'choices' => [
+                                        $r['option_1'] ?: '',
+                                        $r['option_2'] ?: '',
+                                        $r['option_3'] ?: '',
+                                        $r['option_4'] ?: ''
+                                    ],
+                                    'difficulty' => $r['difficulty'] ?: '보통',
+                                    'category' => $r['subject_category'] ?: '회계이론'
+                                ]
+                            ];
+                            $answersMapArr[] = [
+                                $pid,
+                                [
+                                    'answer' => (int)$r['correct_option'],
+                                    'explanation' => $r['explanation'] ?: ''
+                                ]
+                            ];
+                        } else {
+                            $debit = json_decode($r['journal_debit'], true) ?: [];
+                            $credit = json_decode($r['journal_credit'], true) ?: [];
+                            
+                            foreach ($debit as $d) {
+                                if (!empty($d['account'])) $acc_set[$d['account']] = true;
+                            }
+                            foreach ($credit as $c) {
+                                if (!empty($c['account'])) $acc_set[$c['account']] = true;
+                            }
+                            
+                            $problemsMapArr[] = [
+                                $pid,
+                                [
+                                    'text' => $r['question'],
+                                    'difficulty' => $r['difficulty'] ?: '보통',
+                                    'category' => $r['subject_category'] ?: '일반분개'
+                                ]
+                            ];
+                            $answersMapArr[] = [
+                                $pid,
+                                [
+                                    'debit' => $debit,
+                                    'credit' => $credit,
+                                    'explanation' => $r['explanation'] ?: ''
+                                ]
+                            ];
+                        }
+                    }
+                    $dynamicAccounts = array_keys($acc_set);
+                    
+                    $resp = [
+                        'success' => true,
+                        'source' => 'database',
+                        'type' => $qtype,
+                        'fileKey' => $file,
+                        'problemsMapArr' => $problemsMapArr,
+                        'answersMapArr' => $answersMapArr,
+                        'problemIds' => $problemIds,
+                        'dynamicAccounts' => $dynamicAccounts
+                    ];
+                    if ($qtype === 'theory') {
+                        $resp['theoryProblemsMapArr'] = $problemsMapArr;
+                        $resp['theoryAnswersMapArr'] = $answersMapArr;
+                        $resp['theoryProblemIds'] = $problemIds;
+                    }
+                    echo json_encode($resp, JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+            } catch (Exception $e) {
+                error_log("get_quiz DB error: " . $e->getMessage());
+            }
+        }
+
+        // 2단계: 로컬 JSON 캐시 (data/quiz_cache/{file}.json) 조회
+        $cache_file = __DIR__ . '/data/quiz_cache/' . $file . '.json';
+        if (file_exists($cache_file)) {
+            $cached_data = json_decode(file_get_contents($cache_file), true);
+            if (is_array($cached_data) && count($cached_data) > 0) {
+                $acc_set = [];
+                foreach ($cached_data as $r) {
+                    $pid = (string)$r['question_no'];
+                    $problemIds[] = $pid;
+                    
+                    if ($qtype === 'theory') {
+                        $problemsMapArr[] = [
+                            $pid,
+                            [
+                                'text' => $r['question'],
+                                'choices' => [
+                                    $r['option_1'] ?: '',
+                                    $r['option_2'] ?: '',
+                                    $r['option_3'] ?: '',
+                                    $r['option_4'] ?: ''
+                                ],
+                                'difficulty' => $r['difficulty'] ?: '보통',
+                                'category' => $r['subject_category'] ?: '회계이론'
+                            ]
+                        ];
+                        $answersMapArr[] = [
+                            $pid,
+                            [
+                                'answer' => (int)$r['correct_option'],
+                                'explanation' => $r['explanation'] ?: ''
+                            ]
+                        ];
+                    } else {
+                        $debit = json_decode($r['journal_debit'], true) ?: [];
+                        $credit = json_decode($r['journal_credit'], true) ?: [];
+                        
+                        foreach ($debit as $d) {
+                            if (!empty($d['account'])) $acc_set[$d['account']] = true;
+                        }
+                        foreach ($credit as $c) {
+                            if (!empty($c['account'])) $acc_set[$c['account']] = true;
+                        }
+                        
+                        $problemsMapArr[] = [
+                            $pid,
+                            [
+                                'text' => $r['question'],
+                                'difficulty' => $r['difficulty'] ?: '보통',
+                                'category' => $r['subject_category'] ?: '일반분개'
+                            ]
+                        ];
+                        $answersMapArr[] = [
+                            $pid,
+                            [
+                                'debit' => $debit,
+                                'credit' => $credit,
+                                'explanation' => $r['explanation'] ?: ''
+                            ]
+                        ];
+                    }
+                }
+                $dynamicAccounts = array_keys($acc_set);
+                
+                $resp = [
+                    'success' => true,
+                    'source' => 'cache',
+                    'type' => $qtype,
+                    'fileKey' => $file,
+                    'problemsMapArr' => $problemsMapArr,
+                    'answersMapArr' => $answersMapArr,
+                    'problemIds' => $problemIds,
+                    'dynamicAccounts' => $dynamicAccounts
+                ];
+                if ($qtype === 'theory') {
+                    $resp['theoryProblemsMapArr'] = $problemsMapArr;
+                    $resp['theoryAnswersMapArr'] = $answersMapArr;
+                    $resp['theoryProblemIds'] = $problemIds;
+                }
+                echo json_encode($resp, JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
+        // 3단계: DB/캐시 부재 시 엑셀 다운로드 폴백 신호 반환
+        echo json_encode(['success' => false, 'fallback' => 'excel', 'file' => $file]);
         exit;
     }
 

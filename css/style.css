@@ -2374,10 +2374,13 @@ kbd {
     animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 자료실 카드 빠른 업로드 버튼 및 드래그앤드롭 스타일 */
 .btn-quick-upload {
+    display: none;
     cursor: pointer;
     line-height: 1.2;
+}
+.btn-quick-upload.active {
+    display: inline-flex !important;
 }
 .card.drag-over {
     border-color: #3b82f6 !important;
@@ -2473,3 +2476,75 @@ kbd {
 .btn-inline-problem-report:active {
     transform: translateY(0);
 }
+
+/* 문제 내 삽입 이미지(표/도표/영수증 등) 반응형 스타일 */
+.problem-image-container {
+    display: inline-block;
+    max-width: 100%;
+    margin: 0.5rem auto;
+    padding: 0.4rem;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    text-align: center;
+    overflow: hidden;
+}
+.problem-image-container img.problem-image {
+    max-width: 100%;
+    max-height: 280px;
+    height: auto;
+    border-radius: 0.375rem;
+    object-fit: contain;
+    cursor: zoom-in;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: block;
+    margin: 0 auto;
+}
+.problem-image-container img.problem-image:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transform: scale(1.01);
+}
+.problem-image-caption {
+    font-size: 0.72rem;
+    color: #64748b;
+    margin-top: 0.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    user-select: none;
+}
+
+/* 이미지 원본 확대 라이트박스 모달 */
+.problem-lightbox-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    cursor: zoom-out;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+.problem-lightbox-overlay.active {
+    opacity: 1;
+}
+.problem-lightbox-img {
+    max-width: 95vw;
+    max-height: 90vh;
+    border-radius: 0.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    background: #ffffff;
+    padding: 6px;
+    cursor: default;
+}
+

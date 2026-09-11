@@ -86,6 +86,29 @@ window.LearningEngine = (function() {
         if (!rawText) return '';
         let text = String(rawText).trim();
 
+        // 0. 이미지 태그 파싱 ([이미지: 경로] 또는 [img: 경로] 또는 ![설명](경로))
+        let extractedImages = [];
+        text = text.replace(/\[(?:이미지|img)\s*:\s*([^\]]+)\]/gi, (match, p1) => {
+            let src = (p1 || '').trim();
+            if (!src.startsWith('http') && !src.startsWith('/') && !src.startsWith('./') && !src.startsWith('images/')) {
+                src = 'images/problems/' + src;
+            }
+            const safeSrc = encodeURI(src);
+            extractedImages.push(`<div class="problem-image-container my-2"><img src="${safeSrc}" alt="문제 도표 자료" class="problem-image" onclick="window.openProblemImageModal ? window.openProblemImageModal('${safeSrc}') : window.open('${safeSrc}', '_blank')" title="클릭하여 원본 크기로 보기"><div class="problem-image-caption"><span>🔍 클릭하면 크게 확대됩니다</span></div></div>`);
+            return '';
+        });
+        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, p1) => {
+            let src = (p1 || '').trim();
+            if (!src.startsWith('http') && !src.startsWith('/') && !src.startsWith('./') && !src.startsWith('images/')) {
+                src = 'images/problems/' + src;
+            }
+            const safeSrc = encodeURI(src);
+            extractedImages.push(`<div class="problem-image-container my-2"><img src="${safeSrc}" alt="${escapeHtml(alt.trim() || '문제 도표 자료')}" class="problem-image" onclick="window.openProblemImageModal ? window.openProblemImageModal('${safeSrc}') : window.open('${safeSrc}', '_blank')" title="클릭하여 원본 크기로 보기"><div class="problem-image-caption"><span>🔍 클릭하면 크게 확대됩니다</span></div></div>`);
+            return '';
+        }).trim();
+
+        const imagesHtml = extractedImages.length > 0 ? `<div class="text-center w-full">${extractedImages.join('')}</div>` : '';
+
         // 1. 마크다운 테이블 감지 (| 헤더1 | 헤더2 | ...)
         const mdTableRegex = /((?:\|[^\n]+\|\r?\n?){2,})/;
         const mdMatch = text.match(mdTableRegex);
@@ -104,6 +127,7 @@ window.LearningEngine = (function() {
                 const bodyRows = rows.slice(1);
                 let res = '';
                 if (preText) res += `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(preText).replace(/\n/g, '<br>')}</div>`;
+                if (imagesHtml) res += imagesHtml;
                 res += `<div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
                 if (postText) res += `<div class="theory-question-sub mt-2 text-slate-700 leading-relaxed text-left">${escapeHtml(postText).replace(/\n/g, '<br>')}</div>`;
                 return res.trim();
@@ -127,7 +151,7 @@ window.LearningEngine = (function() {
                     for (let r = 0; r < rowCount; r++) {
                         bodyRows.push([dataItems[r], dataItems[r + 3], dataItems[r + 6]]);
                     }
-                    return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+                    return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div>${imagesHtml}<div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
                 }
             }
 
@@ -138,7 +162,7 @@ window.LearningEngine = (function() {
                 if (tableRows.length >= 2 && tableRows[0].length >= 2) {
                     const headerRow = tableRows[0];
                     const bodyRows = tableRows.slice(1);
-                    return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+                    return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div>${imagesHtml}<div class="theory-table-container my-2"><table class="theory-table"><thead><tr>${headerRow.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${bodyRows.map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
                 }
             }
 
@@ -164,11 +188,11 @@ window.LearningEngine = (function() {
                 const isShortItems = mergedLines.every(l => l.length <= 28);
                 const gridClass = isShortItems && mergedLines.length >= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1' : 'space-y-1';
 
-                return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div><div class="theory-bogi-box my-2"><div class="theory-bogi-header"><span class="text-indigo-600">📋</span><span>&lt;${escapeHtml(boxTitle)}&gt;</span></div><div class="theory-bogi-content ${gridClass}">${mergedLines.map(line => `<div class="font-medium text-slate-700">${escapeHtml(line)}</div>`).join('')}</div></div>`;
+                return `<div class="theory-question-main mb-2 font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(qMain).replace(/\n/g, '<br>')}</div>${imagesHtml}<div class="theory-bogi-box my-2"><div class="theory-bogi-header"><span class="text-indigo-600">📋</span><span>&lt;${escapeHtml(boxTitle)}&gt;</span></div><div class="theory-bogi-content ${gridClass}">${mergedLines.map(line => `<div class="font-medium text-slate-700">${escapeHtml(line)}</div>`).join('')}</div></div>`;
             }
         }
 
-        return `<div class="theory-question-main font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+        return `<div class="theory-question-main font-bold text-slate-800 leading-relaxed text-left">${escapeHtml(text).replace(/\n/g, '<br>')}</div>${imagesHtml}`;
     }
 
     async function initLearningApp() {
@@ -1733,15 +1757,13 @@ window.LearningEngine = (function() {
         let targetExcelFiles = [];
         if (type === 'journal') {
             targetExcelFiles = [
-                { name: '1급_전산회계책_분개.xlsx', type: 'journal' },
                 { name: '1급_기출문제_분개.xlsx', type: 'journal' },
-                { name: '1급_분개문제(AI).xlsx', type: 'journal' }
+                { name: '1급_전산회계책_분개.xlsx', type: 'journal' }
             ];
         } else {
             targetExcelFiles = [
-                { name: '1급_전산회계책_필기.xlsx', type: 'theory' },
                 { name: '1급_기출문제_필기.xlsx', type: 'theory' },
-                { name: '1급_필기문제(AI).xlsx', type: 'theory' }
+                { name: '1급_전산회계책_필기.xlsx', type: 'theory' }
             ];
         }
 

@@ -263,28 +263,22 @@ function openQuizApp(mode, level = '2급') {
                 h1.innerText = '1급 전산회계책 분개';
             } else if (level === '전산회계2급책') {
                 h1.innerText = '2급 전산회계책 분개';
-            } else if (level === '회계2급기출') {
-                h1.innerText = '2급 전산회계 기출 분개';
-            } else if (level === '회계1급기출') {
+            } else if (level === '회계1급기출' || level === '1급') {
                 h1.innerText = '1급 전산회계 기출 분개';
-            } else if (level === '1급') {
-                h1.innerText = '1급 분개문제 (AI)';
             } else {
-                h1.innerText = '2급 분개문제 (AI)';
+                h1.innerText = '2급 전산회계 기출 분개';
             }
         }
         
-        let fileToLoad = '2급_분개문제(AI).xlsx';
-        if (level === '1급') {
-            fileToLoad = '1급_분개문제(AI).xlsx';
+        let fileToLoad = '2급_기출문제_분개.xlsx';
+        if (level === '회계1급기출' || level === '1급') {
+            fileToLoad = '1급_기출문제_분개.xlsx';
         } else if (level === '전산회계1급책' || level === 'FAT1급책') {
             fileToLoad = '1급_전산회계책_분개.xlsx';
         } else if (level === '전산회계2급책') {
             fileToLoad = '2급_전산회계책_분개.xlsx';
-        } else if (level === '회계2급기출') {
+        } else if (level === '회계2급기출' || level === '2급') {
             fileToLoad = '2급_기출문제_분개.xlsx';
-        } else if (level === '회계1급기출') {
-            fileToLoad = '1급_기출문제_분개.xlsx';
         }
 
         if (typeof resetJournalQuiz === 'function') resetJournalQuiz();
@@ -300,28 +294,22 @@ function openQuizApp(mode, level = '2급') {
                 h1.innerText = '1급 전산회계책 필기';
             } else if (level === '전산회계2급책') {
                 h1.innerText = '2급 전산회계책 필기';
-            } else if (level === '회계2급기출') {
-                h1.innerText = '2급 전산회계 기출 필기';
-            } else if (level === '회계1급기출') {
+            } else if (level === '회계1급기출' || level === '1급') {
                 h1.innerText = '1급 전산회계 기출 필기';
-            } else if (level === '1급') {
-                h1.innerText = '1급 필기문제 (AI)';
             } else {
-                h1.innerText = '2급 필기문제 (AI)';
+                h1.innerText = '2급 전산회계 기출 필기';
             }
         }
         
-        let fileToLoad = '2급_필기문제(AI).xlsx';
-        if (level === '1급') {
-            fileToLoad = '1급_필기문제(AI).xlsx';
+        let fileToLoad = '2급_기출문제_필기.xlsx';
+        if (level === '회계1급기출' || level === '1급') {
+            fileToLoad = '1급_기출문제_필기.xlsx';
         } else if (level === '전산회계1급책' || level === 'FAT1급책') {
             fileToLoad = '1급_전산회계책_필기.xlsx';
         } else if (level === '전산회계2급책') {
             fileToLoad = '2급_전산회계책_필기.xlsx';
-        } else if (level === '회계2급기출') {
+        } else if (level === '회계2급기출' || level === '2급') {
             fileToLoad = '2급_기출문제_필기.xlsx';
-        } else if (level === '회계1급기출') {
-            fileToLoad = '1급_기출문제_필기.xlsx';
         }
 
         if (typeof resetTheoryQuiz === 'function') resetTheoryQuiz();
@@ -666,15 +654,14 @@ async function applyTheoryData(data) {
     if (typeof theoryProblemsMap !== 'undefined') {
         theoryProblemsMap.clear();
         theoryAnswersMap.clear();
-        let rawIds = data.theoryProblemIds || [];
+        let rawIds = data.theoryProblemIds || data.problemIds || [];
         unusedTheoryIds = [];
         
-        if (data.theoryProblemsMapArr) {
-            data.theoryProblemsMapArr.forEach(arr => theoryProblemsMap.set(arr[0], arr[1]));
-        }
-        if (data.theoryAnswersMapArr) {
-            data.theoryAnswersMapArr.forEach(arr => theoryAnswersMap.set(arr[0], arr[1]));
-        }
+        const probArr = data.theoryProblemsMapArr || data.problemsMapArr || [];
+        const ansArr = data.theoryAnswersMapArr || data.answersMapArr || [];
+
+        probArr.forEach(arr => theoryProblemsMap.set(arr[0], arr[1]));
+        ansArr.forEach(arr => theoryAnswersMap.set(arr[0], arr[1]));
 
         theoryProblemIds = await filterQuarantinedIds(currentLoadingTheoryFile, rawIds);
 
@@ -738,27 +725,45 @@ function fetchExcelFile(url = '분개문제.xlsx') {
     }
 
     const status = document.getElementById('status-message');
-    if (status) status.innerHTML = `엑셀 파일을 불러오는 중입니다... ⏳`;
+    if (status) status.innerHTML = `문제 데이터를 불러오는 중입니다... ⏳`;
     const startBtn = document.getElementById('start-btn');
     if (startBtn) startBtn.disabled = true;
 
     const cleanUrl = url.replace(/^excels\//, '');
-    const targetUrl = '?action=download_excel&file=' + encodeURIComponent(cleanUrl);
 
-    fetch(targetUrl)
-        .then(res => {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.arrayBuffer();
-        })
-        .then(buffer => {
-            if (window.excelWorker) {
-                window.excelWorker.postMessage({ data: buffer, type: 'journal', fileKey: url });
+    // 1순위: DB/고속 JSON 캐시 API 호출 (?action=get_quiz)
+    fetch('?action=get_quiz&file=' + encodeURIComponent(cleanUrl))
+        .then(res => res.json())
+        .then(resData => {
+            if (resData && resData.success) {
+                window.quizDataCache[url] = resData;
+                applyJournalData(resData);
+            } else {
+                fallbackExcelFetch();
             }
         })
         .catch(err => {
-            console.error(`[${targetUrl}] 로드 실패:`, err);
-            if (status) status.innerHTML = `'${url}' 파일을 불러오지 못했습니다. (서버 통신 오류)`;
+            console.warn('[get_quiz journal] 실패, 엑셀 다운로드로 전환:', err);
+            fallbackExcelFetch();
         });
+
+    function fallbackExcelFetch() {
+        const targetUrl = '?action=download_excel&file=' + encodeURIComponent(cleanUrl);
+        fetch(targetUrl)
+            .then(res => {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.arrayBuffer();
+            })
+            .then(buffer => {
+                if (window.excelWorker) {
+                    window.excelWorker.postMessage({ data: buffer, type: 'journal', fileKey: url });
+                }
+            })
+            .catch(err => {
+                console.error(`[${targetUrl}] 로드 실패:`, err);
+                if (status) status.innerHTML = `'${url}' 파일을 불러오지 못했습니다. (서버 통신 오류)`;
+            });
+    }
 }
 
 function handleFileSelect(e) {
@@ -782,27 +787,31 @@ function parseWorkbook(data) {
 // 백그라운드 프리페치 함수 (모든 문제 파일 사전 캐싱)
 async function prefetchAllQuizFiles() {
     const filesToPrefetch = [
-        { url: '2급_분개문제(AI).xlsx', type: 'journal' },
-        { url: '2급_필기문제(AI).xlsx', type: 'theory' },
+        { url: '2급_기출문제_분개.xlsx', type: 'journal' },
+        { url: '2급_기출문제_필기.xlsx', type: 'theory' },
         { url: '2급_전산회계책_분개.xlsx', type: 'journal' },
         { url: '2급_전산회계책_필기.xlsx', type: 'theory' },
-        { url: '2급_기출문제_필기.xlsx', type: 'theory' },
-        { url: '2급_기출문제_분개.xlsx', type: 'journal' },
-        { url: '1급_분개문제(AI).xlsx', type: 'journal' },
-        { url: '1급_필기문제(AI).xlsx', type: 'theory' },
-        { url: '1급_전산회계책_분개.xlsx', type: 'journal' },
-        { url: '1급_전산회계책_필기.xlsx', type: 'theory' },
         { url: '1급_기출문제_분개.xlsx', type: 'journal' },
-        { url: '1급_기출문제_필기.xlsx', type: 'theory' }
+        { url: '1급_기출문제_필기.xlsx', type: 'theory' },
+        { url: '1급_전산회계책_분개.xlsx', type: 'journal' },
+        { url: '1급_전산회계책_필기.xlsx', type: 'theory' }
     ];
 
     for (const item of filesToPrefetch) {
         if (!window.quizDataCache[item.url]) {
             try {
-                const targetUrl = '?action=download_excel&file=' + encodeURIComponent(item.url);
-                const res = await fetch(targetUrl);
+                const res = await fetch('?action=get_quiz&file=' + encodeURIComponent(item.url));
                 if (res.ok) {
-                    const buffer = await res.arrayBuffer();
+                    const resData = await res.json();
+                    if (resData && resData.success) {
+                        window.quizDataCache[item.url] = resData;
+                        continue;
+                    }
+                }
+                const targetUrl = '?action=download_excel&file=' + encodeURIComponent(item.url);
+                const exRes = await fetch(targetUrl);
+                if (exRes.ok) {
+                    const buffer = await exRes.arrayBuffer();
                     if (window.excelWorker) {
                         window.excelWorker.postMessage({ data: buffer, type: item.type, fileKey: item.url });
                     }

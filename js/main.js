@@ -200,6 +200,9 @@ function renderSectionTitles() {
             el.textContent = sectionTitles[cat];
         }
     });
+    if (typeof updateModalCategoryOptions === 'function') {
+        updateModalCategoryOptions();
+    }
 }
 
 async function editSectionTitle(category) {
@@ -298,6 +301,31 @@ function toggleViewMode() {
     }
 }
 
+let isAppInitialized = false;
+
+function loadMainAppData() {
+    if (isAppInitialized) return;
+    isAppInitialized = true;
+    
+    // 메인 스레드 부담을 없애기 위해 50ms 후 비동기 로드
+    setTimeout(async () => {
+        try {
+            await fetchSectionTitles();
+            await fetchFiles();
+            setupCardDragAndDrop();
+            
+            // 엑셀 프리페치는 300ms 후 여유 있을 때 백그라운드에서 로드
+            setTimeout(() => {
+                if (typeof fetchExcelFile === 'function') fetchExcelFile('2급_기출문제_분개.xlsx');
+                if (typeof fetchTheoryExcelFile === 'function') fetchTheoryExcelFile('2급_기출문제_필기.xlsx');
+            }, 300);
+        } catch(e) {
+            console.error('loadMainAppData error:', e);
+        }
+    }, 50);
+}
+window.loadMainAppData = loadMainAppData;
+
 async function init() {
     updateViewToggleButton();
     updateGradeUI();
@@ -308,17 +336,21 @@ async function init() {
     if (localStorage.getItem('active_view') === 'learning') {
         openLearningCourseApp();
     }
-    await fetchSectionTitles();
-    await fetchFiles();
+    
+    // 로그인된 상태인지 확인 (관리자 또는 일반 회원)
+    const hasLoggedIn = !!(isCurrentAdminCheck() || window.sessionStorage.getItem('learning_username') || (window.currentUser && window.currentUser.username));
+    
     // 15분 idle 자동 로그아웃 타이머 시작
     startIdleTimer();
     initResizer('resizer1', 'col1-sub-grid', 'card-drawing', 'col1-wrapper');
     initResizer('resizer2', 'card-seohee', 'card-heera', 'col2-wrapper');
     initModalDrag();
-    setupCardDragAndDrop();
-    
-    if (typeof fetchExcelFile === 'function') fetchExcelFile('2급_분개문제(AI).xlsx');
-    if (typeof fetchTheoryExcelFile === 'function') fetchTheoryExcelFile('2급_필기문제(AI).xlsx');
+
+    if (hasLoggedIn) {
+        // 이미 로그인된 사용자는 백그라운드에서 부드럽게 데이터 로드
+        loadMainAppData();
+    }
+    // 비로그인 상태(게이트 표시 중)일 때는 무거운 엑셀 다운로드 및 파일 조회를 지연하여 아이디 타이핑 렉 방지
 
     if (window.innerWidth <= 1024) {
         setTimeout(() => {
@@ -327,7 +359,6 @@ async function init() {
             }
         }, 500);
     }
-
 }
 
 function setupCardDragAndDrop() {
@@ -391,7 +422,7 @@ async function uploadDroppedFiles(files, category) {
                 formData.append('chunk_index', chunkIndex);
                 formData.append('total_chunks', totalChunks);
                 
-                const res = await fetch('?action=upload', {
+                const res = await fetch(`?action=upload&grade=${encodeURIComponent(currentGrade)}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -544,6 +575,8 @@ function closeSiteLoginModal() {
     }
 }
 
+let modalUploadGrade = 'grade2';
+
 function createAdminUploadModalElement() {
     if (document.getElementById('admin-upload-modal')) return;
     const div = document.createElement('div');
@@ -554,23 +587,43 @@ function createAdminUploadModalElement() {
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
                 <div class="flex items-center gap-2">
                     <span class="text-2xl">📁</span>
-                    <h3 class="text-lg font-bold text-slate-800">관리자 자료 올리기</h3>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">자료 올리기 (업로드)</h3>
+                        <p class="text-[11px] text-slate-400">급수와 카테고리를 확인 후 업로드하세요</p>
+                    </div>
                 </div>
                 <button type="button" onclick="closeAdminUploadModal()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold p-1 leading-none">&times;</button>
             </div>
             <div class="space-y-4 text-left">
+                <!-- 급수 선택 탭 (초급 2급 / 중급 1급) -->
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">올릴 카테고리 선택</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>🎯 자료실 구분 (급수 선택)</span>
+                        <span id="modal-grade-indicator" class="text-[11px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">초급(2급) 선택됨</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+                        <button type="button" id="modal-grade-btn-grade2" onclick="setModalUploadGrade('grade2')" class="py-2.5 px-3 text-xs sm:text-sm font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs bg-white text-blue-600 border border-blue-200">
+                            <span>🌱</span> 초급 (2급) 자료실
+                        </button>
+                        <button type="button" id="modal-grade-btn-grade1" onclick="setModalUploadGrade('grade1')" class="py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-700">
+                            <span>🌿</span> 중급 (1급) 자료실
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 올릴 카테고리 선택 (사용자가 수정한 최신 이름 반영) -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                        <span>📂 올릴 카테고리 (수정한 섹션명 반영)</span>
+                        <span class="text-[10px] text-slate-400">✏️ 수정한 제목 실시간 동기화</span>
+                    </label>
                     <select id="admin-upload-category" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-700 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm">
-                        <option value="accounting">📘 전산회계 자료</option>
-                        <option value="general">📁 일반 자료</option>
-                        <option value="drawing">🎨 그림 자료</option>
-                        <option value="seohee">👩‍🏫 이서희선생님 자료</option>
-                        <option value="heera">👨‍🏫 우승현선생님 자료 (희라쌤)</option>
+                        <!-- updateModalCategoryOptions() 로 동적 생성 -->
                     </select>
                 </div>
+
                 <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">업로드할 파일 선택 (다중 선택 가능)</label>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">업로드할 파일 선택 (다중 선택 가능)</label>
                     <input type="file" id="admin-upload-files" multiple class="w-full text-xs text-slate-600 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100 cursor-pointer border border-dashed border-slate-300 rounded-xl p-3 bg-slate-50">
                     <p class="text-[11px] text-slate-400 mt-1">💡 PDF, 한글(HWP/HWPX), 엑셀, 이미지 등 모든 학습자료 업로드 지원</p>
                 </div>
@@ -592,15 +645,64 @@ function createAdminUploadModalElement() {
     });
 }
 
-function openAdminUploadModal(defaultCategory = 'accounting') {
+function setModalUploadGrade(grade, keepCategory = null) {
+    modalUploadGrade = (grade === 'grade1') ? 'grade1' : 'grade2';
+    const btn2 = document.getElementById('modal-grade-btn-grade2');
+    const btn1 = document.getElementById('modal-grade-btn-grade1');
+    const indicator = document.getElementById('modal-grade-indicator');
+    
+    if (btn2 && btn1) {
+        if (modalUploadGrade === 'grade2') {
+            btn2.className = 'py-2.5 px-3 text-xs sm:text-sm font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs bg-white text-blue-600 border border-blue-200';
+            btn1.className = 'py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-700 border border-transparent';
+            if (indicator) {
+                indicator.textContent = '초급(2급) 선택됨';
+                indicator.className = 'text-[11px] font-extrabold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full';
+            }
+        } else {
+            btn1.className = 'py-2.5 px-3 text-xs sm:text-sm font-black rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs bg-white text-indigo-600 border border-indigo-200';
+            btn2.className = 'py-2.5 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 text-slate-500 hover:text-slate-700 border border-transparent';
+            if (indicator) {
+                indicator.textContent = '중급(1급) 선택됨';
+                indicator.className = 'text-[11px] font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full';
+            }
+        }
+    }
+    updateModalCategoryOptions(keepCategory);
+}
+
+function updateModalCategoryOptions(preferredCategory = null) {
+    const catSelect = document.getElementById('admin-upload-category');
+    if (!catSelect) return;
+    
+    const currentCat = preferredCategory || catSelect.value || 'accounting';
+    const titles = (sectionTitles && sectionTitles[modalUploadGrade]) ? sectionTitles[modalUploadGrade] : {};
+    
+    const catConfigs = [
+        { key: 'accounting', icon: '📘', defaultTitle: '전산회계 자료' },
+        { key: 'general', icon: '📁', defaultTitle: '일반 자료' },
+        { key: 'drawing', icon: '🎨', defaultTitle: '그림 자료' },
+        { key: 'seohee', icon: '👩‍🏫', defaultTitle: modalUploadGrade === 'grade1' ? '1급 전용자료' : '이서희선생님 자료' },
+        { key: 'heera', icon: '👨‍🏫', defaultTitle: modalUploadGrade === 'grade1' ? '1급 심화자료' : '우승현선생님 자료 (희라쌤자료)' }
+    ];
+    
+    catSelect.innerHTML = catConfigs.map(c => {
+        const title = (titles[c.key] && titles[c.key].trim() !== '') ? titles[c.key] : c.defaultTitle;
+        const selected = (c.key === currentCat) ? 'selected' : '';
+        return `<option value="${c.key}" ${selected}>${c.icon} ${title}</option>`;
+    }).join('');
+}
+
+function openAdminUploadModal(defaultCategory = 'accounting', targetGrade = null) {
     let modal = document.getElementById('admin-upload-modal');
     if (!modal) {
         createAdminUploadModalElement();
         modal = document.getElementById('admin-upload-modal');
     }
     if (modal) {
-        const catSelect = document.getElementById('admin-upload-category');
-        if (catSelect && defaultCategory) catSelect.value = defaultCategory;
+        const gradeToUse = targetGrade || currentGrade || 'grade2';
+        setModalUploadGrade(gradeToUse, defaultCategory);
+        
         const fileInput = document.getElementById('admin-upload-files');
         if (fileInput) fileInput.value = '';
         const statusEl = document.getElementById('admin-upload-status');
@@ -654,28 +756,43 @@ async function submitAdminUpload() {
                 formData.append('file', chunk);
                 formData.append('filename', file.name);
                 formData.append('category', category);
-                formData.append('grade', currentGrade);
+                formData.append('grade', modalUploadGrade);
                 formData.append('chunk_index', chunkIndex);
                 formData.append('total_chunks', totalChunks);
                 
-                const res = await fetch('?action=upload', {
+                const res = await fetch(`?action=upload&grade=${encodeURIComponent(modalUploadGrade)}`, {
                     method: 'POST',
                     body: formData
                 });
                 
                 if (!res.ok) {
-                    throw new Error(`파일 ${file.name} 업로드 실패 (HTTP ${res.status})`);
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error || `파일 ${file.name} 업로드 실패 (HTTP ${res.status})`);
                 }
             }
         }
         
+        const gradeText = modalUploadGrade === 'grade1' ? '중급(1급)' : '초급(2급)';
+        const catLabel = catSelect.options[catSelect.selectedIndex] ? catSelect.options[catSelect.selectedIndex].text : category;
+        
         statusEl.className = 'text-xs mt-2 font-bold text-center text-emerald-600 block';
-        statusEl.innerText = `🎉 총 ${files.length}개 파일 업로드 완료!`;
-        await fetchFiles();
+        statusEl.innerText = `🎉 [${gradeText} - ${catLabel}] 총 ${files.length}개 업로드 완료!`;
+        
+        // 업로드한 급수와 현재 웹 화면의 급수 동기화
+        if (currentGrade !== modalUploadGrade) {
+            if (typeof switchGrade === 'function') {
+                await switchGrade(modalUploadGrade);
+            } else {
+                currentGrade = modalUploadGrade;
+                await fetchFiles();
+            }
+        } else {
+            await fetchFiles();
+        }
         
         setTimeout(() => {
             closeAdminUploadModal();
-            window.showAlert(`자료가 성공적으로 등록되었습니다! (${files.length}건)`);
+            window.showAlert(`자료가 성공적으로 등록되었습니다!\n[${gradeText}] ${catLabel} (${files.length}건)`);
         }, 800);
         
     } catch (err) {
@@ -755,6 +872,7 @@ function renderLoginSection() {
             </div>
         `;
     }
+    toggleUploadSections();
 }
 
 async function globalLogout() {
@@ -834,6 +952,18 @@ function toggleUploadSections() {
     editBtns.forEach(btn => {
         if (adminActive) btn.classList.remove('hidden');
         else btn.classList.add('hidden');
+    });
+    const quickUploadBtns = document.querySelectorAll('.btn-quick-upload');
+    quickUploadBtns.forEach(btn => {
+        if (adminActive) {
+            btn.classList.add('active');
+            btn.classList.remove('hidden');
+            btn.style.display = 'inline-flex';
+        } else {
+            btn.classList.remove('active');
+            btn.classList.add('hidden');
+            btn.style.display = 'none';
+        }
     });
 }
 
@@ -1052,7 +1182,7 @@ async function uploadFile(category) {
         progressEl.innerText = `업로드 중... ${Math.round((chunkIndex / totalChunks) * 100)}%`;
         
         try {
-            const res = await fetch('?action=upload', {
+            const res = await fetch(`?action=upload&grade=${encodeURIComponent(currentGrade)}`, {
                 method: 'POST',
                 body: formData
             });
@@ -2021,6 +2151,7 @@ async function restoreSessionFromServer() {
                 window.sessionStorage.setItem('learning_username', username);
                 renderLoginSection();
                 if (typeof syncUserName === 'function') syncUserName(username);
+                if (typeof loadMainAppData === 'function') loadMainAppData();
                 return;
             }
         }
@@ -2029,6 +2160,7 @@ async function restoreSessionFromServer() {
             window.currentUser = { username: storedUser, is_admin: (storedUser === '이우성' || storedUser === 'admin') };
             renderLoginSection();
             if (typeof syncUserName === 'function') syncUserName(storedUser);
+            if (typeof loadMainAppData === 'function') loadMainAppData();
         }
     } catch(e) {
         console.warn('세션 복원 시 경고:', e);
@@ -2036,6 +2168,7 @@ async function restoreSessionFromServer() {
         if (storedUser) {
             window.currentUser = { username: storedUser, is_admin: (storedUser === '이우성' || storedUser === 'admin') };
             renderLoginSection();
+            if (typeof loadMainAppData === 'function') loadMainAppData();
         }
     }
 }
@@ -2053,14 +2186,14 @@ function openProblemReportModal(quizType) {
     let targetTitle = '';
 
     if (quizType === 'journal') {
-        targetExcel = (typeof currentLoadingJournalFile !== 'undefined' && currentLoadingJournalFile ? currentLoadingJournalFile : '2급_분개문제(AI).xlsx').replace(/^excels\//, '');
+        targetExcel = (typeof currentLoadingJournalFile !== 'undefined' && currentLoadingJournalFile ? currentLoadingJournalFile : '2급_기출문제_분개.xlsx').replace(/^excels\//, '');
         targetProblemId = (typeof currentProblemId !== 'undefined' && currentProblemId !== null ? currentProblemId : '');
         if (typeof problemsMap !== 'undefined' && targetProblemId) {
             const p = problemsMap.get(targetProblemId);
             targetTitle = (p && typeof p === 'object' ? p.text : (p || '')) + '';
         }
     } else {
-        targetExcel = (typeof currentLoadingTheoryFile !== 'undefined' && currentLoadingTheoryFile ? currentLoadingTheoryFile : '2급_필기문제(AI).xlsx').replace(/^excels\//, '');
+        targetExcel = (typeof currentLoadingTheoryFile !== 'undefined' && currentLoadingTheoryFile ? currentLoadingTheoryFile : '2급_기출문제_필기.xlsx').replace(/^excels\//, '');
         targetProblemId = (typeof currentTheoryId !== 'undefined' && currentTheoryId !== null ? currentTheoryId : '');
         if (typeof theoryProblemsMap !== 'undefined' && targetProblemId) {
             const p = theoryProblemsMap.get(targetProblemId);

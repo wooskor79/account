@@ -717,6 +717,44 @@ function loadRandomProblem() {
     renderCurrentProblem();
 }
 
+function escapeJournalHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function formatJournalProblemHtml(rawText) {
+    if (!rawText) return '';
+    let text = String(rawText).trim();
+
+    let extractedImages = [];
+    text = text.replace(/\[(?:이미지|img)\s*:\s*([^\]]+)\]/gi, (match, p1) => {
+        let src = (p1 || '').trim();
+        if (!src.startsWith('http') && !src.startsWith('/') && !src.startsWith('./') && !src.startsWith('images/')) {
+            src = 'images/problems/' + src;
+        }
+        const safeSrc = encodeURI(src);
+        extractedImages.push(`<div class="problem-image-container my-2 text-center"><img src="${safeSrc}" alt="문제 증빙 자료" class="problem-image" onclick="window.openProblemImageModal ? window.openProblemImageModal('${safeSrc}') : window.open('${safeSrc}', '_blank')" title="클릭하여 원본 크기로 보기"><div class="problem-image-caption"><span>🔍 클릭하면 크게 확대됩니다</span></div></div>`);
+        return '';
+    });
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, p1) => {
+        let src = (p1 || '').trim();
+        if (!src.startsWith('http') && !src.startsWith('/') && !src.startsWith('./') && !src.startsWith('images/')) {
+            src = 'images/problems/' + src;
+        }
+        const safeSrc = encodeURI(src);
+        extractedImages.push(`<div class="problem-image-container my-2 text-center"><img src="${safeSrc}" alt="${escapeJournalHtml(alt.trim() || '문제 증빙 자료')}" class="problem-image" onclick="window.openProblemImageModal ? window.openProblemImageModal('${safeSrc}') : window.open('${safeSrc}', '_blank')" title="클릭하여 원본 크기로 보기"><div class="problem-image-caption"><span>🔍 클릭하면 크게 확대됩니다</span></div></div>`);
+        return '';
+    }).trim();
+
+    const imagesHtml = extractedImages.length > 0 ? `<div class="text-center w-full">${extractedImages.join('')}</div>` : '';
+    return `<div>${escapeJournalHtml(text).replace(/\n/g, '<br>')}</div>${imagesHtml}`;
+}
+
 function retryProblem() {
     renderCurrentProblem();
 }
@@ -727,7 +765,7 @@ function renderCurrentProblem() {
     const diff = (typeof probObj === 'object' && probObj.difficulty) ? probObj.difficulty : '';
     const category = (typeof probObj === 'object' && probObj.category) ? probObj.category : '';
 
-    document.getElementById('problem-text').innerText = questionText;
+    document.getElementById('problem-text').innerHTML = formatJournalProblemHtml(questionText);
     
     if (isWrongQuizMode) {
         document.getElementById('question-badge').innerText = `📌 오답복습 #${currentProblemId}`;
